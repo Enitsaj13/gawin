@@ -1,18 +1,53 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from 'expo-router';
+import {
+  SpaceMono_400Regular,
+  SpaceMono_700Bold,
+  useFonts,
+} from '@expo-google-fonts/space-mono';
+import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { useColorScheme } from 'react-native';
+import { useEffect, useState } from 'react';
 
-import { AnimatedSplashOverlay } from '@/components/animated-icon';
-import AppTabs from '@/components/app-tabs';
+import { ToastProvider } from '@/components/toast';
+import { LoadingScreen } from '@/features/todos/loading-screen';
+import { TodosProvider, useTodos } from '@/features/todos/todos-context';
 
-SplashScreen.preventAutoHideAsync();
+void SplashScreen.preventAutoHideAsync();
+SplashScreen.setOptions({ duration: 220, fade: true });
 
-export default function TabLayout() {
-  const colorScheme = useColorScheme();
+function AppNavigator() {
+  const { isReady } = useTodos();
+  const [launchFinished, setLaunchFinished] = useState(false);
+
+  if (!launchFinished) {
+    return (
+      <LoadingScreen
+        onFinished={() => setLaunchFinished(true)}
+        ready={isReady}
+      />
+    );
+  }
+
+  return <Stack screenOptions={{ headerShown: false, animation: 'fade' }} />;
+}
+
+export default function RootLayout() {
+  const [fontsLoaded, fontError] = useFonts({
+    SpaceMono_400Regular,
+    SpaceMono_700Bold,
+  });
+  const resourcesReady = fontsLoaded || Boolean(fontError);
+
+  useEffect(() => {
+    if (resourcesReady) SplashScreen.hide();
+  }, [resourcesReady]);
+
+  if (!resourcesReady) return null;
+
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <AnimatedSplashOverlay />
-      <AppTabs />
-    </ThemeProvider>
+    <ToastProvider>
+      <TodosProvider>
+        <AppNavigator />
+      </TodosProvider>
+    </ToastProvider>
   );
 }
