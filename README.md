@@ -1,56 +1,92 @@
-# Welcome to your Expo app 👋
+# Gawin
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+**Focus on today. Gawin.**
 
-## Get started
+Gawin is a minimalist, offline-first task app designed around one simple idea:
+keep your attention on what needs to be done today. Past tasks stay out of the
+way while remaining available whenever you need them.
 
-1. Install dependencies
+The name comes from the Filipino word _gawin_—to do or get something done.
 
-   ```bash
-   npm install
-   ```
+## Features
 
-2. Start the app
+- A focused home screen that shows only today's tasks
+- Task creation, editing, completion, and deletion with undo
+- A separate history for browsing tasks from previous dates
+- The option to move unfinished past tasks back to today
+- Daily repeating tasks for simple routines
+- Minimalist action sheets, toast messages, and tactile feedback
+- Fully offline storage with no account required
+- Manual JSON backup and restore using files you control
+- Safe backup previews with merge and replace options
 
-   ```bash
-   npx expo start
-   ```
+## Privacy and backups
 
-In the output, you'll find options to open the app in a
+Gawin stores tasks locally on the device and does not require an internet
+connection. It does not automatically upload task data to a server.
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+Backups can be exported as readable JSON files and saved to Files, iCloud
+Drive, Google Drive, AirDrop, or another location supported by the device.
+During import, Gawin validates and previews the file before making changes.
 
-You can start developing by editing the files inside the **src/app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+Because backup files contain task titles, keep them somewhere private.
 
-## Get a fresh project
+## Built with
 
-When you're ready, run:
+- [Expo](https://expo.dev/)
+- [React Native](https://reactnative.dev/)
+- [Expo Router](https://docs.expo.dev/router/introduction/)
+- [TypeScript](https://www.typescriptlang.org/)
+- [AsyncStorage](https://react-native-async-storage.github.io/async-storage/)
+
+## Getting started
+
+### Requirements
+
+- [Node.js](https://nodejs.org/)
+- [pnpm](https://pnpm.io/)
+- Expo Go, an iOS Simulator, or an Android Emulator
+
+### Run locally
 
 ```bash
-npm run reset-project
+git clone https://github.com/Enitsaj13/gawin.git
+cd gawin
+pnpm install
+npx expo start
 ```
 
-This command will move the starter code to the **example** directory and create a blank **src/app** directory where you can start developing.
+From the Expo terminal, scan the QR code with Expo Go or select an available
+simulator or emulator.
 
-### Other setup steps
+## Development commands
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+```bash
+# Start the development server
+npx expo start
 
-## Learn more
+# Run ESLint
+npx expo lint
 
-To learn more about developing your project with Expo, look at the following resources:
+# Run the TypeScript compiler check
+npx tsc --noEmit
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+# Check the Expo project configuration and dependencies
+npx expo-doctor
+```
 
-## Join the community
+## Project structure
 
-Join our community of developers creating universal apps.
+```text
+src/
+├── app/                 # Expo Router screens and layouts
+├── components/          # Shared interface components
+├── features/todos/      # Tasks, routines, actions, and backup logic
+└── lib/                 # Shared utilities
+```
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+## Design
+
+Gawin uses a restrained monochrome interface, generous spacing, and clear
+feedback to keep task management calm and distraction-free. Its primary view
+deliberately prioritizes today instead of presenting an overwhelming backlog.
