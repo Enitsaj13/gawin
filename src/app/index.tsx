@@ -1,3 +1,4 @@
+import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useState } from 'react';
@@ -101,21 +102,26 @@ export default function HomeScreen() {
           </View>
         </ScrollView>
 
-        <View pointerEvents="box-none" style={styles.buttonDock}>
+        <View pointerEvents="box-none" style={styles.floatingButtonDock}>
           <Pressable
             accessibilityLabel="Create a new task"
             accessibilityRole="button"
-            onPress={() => setComposer({ mode: 'create' })}
+            accessibilityHint="Opens the new task form"
+            onPress={() => {
+              void Haptics.impactAsync(
+                Haptics.ImpactFeedbackStyle.Light,
+              ).catch(() => undefined);
+              setComposer({ mode: 'create' });
+            }}
             style={({ pressed }) => [
               styles.newTaskButton,
-              pressed && styles.buttonPressed,
+              pressed && styles.floatingButtonPressed,
             ]}
           >
             <View style={styles.plusIcon}>
               <View style={styles.plusHorizontal} />
               <View style={styles.plusVertical} />
             </View>
-            <Text style={styles.newTaskText}>New task</Text>
           </Pressable>
         </View>
       </View>
@@ -240,33 +246,34 @@ const styles = StyleSheet.create({
   emptyToday: {
     minHeight: 80,
   },
-  buttonDock: {
+  floatingButtonDock: {
     position: 'absolute',
-    right: 0,
-    bottom: 0,
-    left: 0,
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    backgroundColor: 'rgba(251, 251, 249, 0.96)',
+    right: 20,
+    bottom: 18,
+    zIndex: 10,
   },
   newTaskButton: {
-    minHeight: 54,
-    flexDirection: 'row',
+    width: 56,
+    height: 56,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 9,
+    borderRadius: 2,
     backgroundColor: '#111111',
+  },
+  floatingButtonPressed: {
+    opacity: 0.82,
+    transform: [{ scale: 0.96 }],
   },
   buttonPressed: {
     opacity: 0.76,
   },
   plusIcon: {
-    width: 12,
-    height: 12,
+    width: 18,
+    height: 18,
   },
   plusHorizontal: {
     position: 'absolute',
-    top: 5.25,
+    top: 8.25,
     right: 0,
     left: 0,
     height: 1.5,
@@ -276,13 +283,8 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 0,
     bottom: 0,
-    left: 5.25,
+    left: 8.25,
     width: 1.5,
     backgroundColor: '#ffffff',
-  },
-  newTaskText: {
-    color: '#ffffff',
-    fontFamily: 'SpaceMono_700Bold',
-    fontSize: 13,
   },
 });

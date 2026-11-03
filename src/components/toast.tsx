@@ -11,8 +11,9 @@ import {
 import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-const BOTTOM_CONTROLS_HEIGHT = 78;
-const TOAST_GAP = 14;
+const FLOATING_BUTTON_SIZE = 56;
+const FLOATING_BUTTON_BOTTOM = 18;
+const TOAST_GAP = 12;
 
 type ToastAction =
   | 'backup'
@@ -205,7 +206,11 @@ export function ToastProvider({ children }: PropsWithChildren) {
             style={[
               styles.positioner,
               {
-                bottom: insets.bottom + BOTTOM_CONTROLS_HEIGHT + TOAST_GAP,
+                bottom:
+                  insets.bottom +
+                  FLOATING_BUTTON_BOTTOM +
+                  FLOATING_BUTTON_SIZE +
+                  TOAST_GAP,
               },
             ]}
           >
