@@ -32,6 +32,7 @@ export function TaskComposer({
   onSubmit,
 }: TaskComposerProps) {
   const [title, setTitle] = useState(initialTitle);
+  const [inputFocused, setInputFocused] = useState(false);
 
   const close = () => {
     setTitle('');
@@ -55,26 +56,36 @@ export function TaskComposer({
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardView}
       >
-        <Pressable
-          accessibilityRole="button"
-          onPress={close}
-          style={styles.backdrop}
-        >
-          <Pressable onPress={() => undefined} style={styles.sheet}>
+        <View style={styles.backdrop}>
+          <Pressable
+            accessibilityLabel="Close task editor"
+            accessibilityRole="button"
+            onPress={close}
+            style={StyleSheet.absoluteFill}
+          />
+          <View style={styles.sheet}>
             <Text style={styles.eyebrow}>{formatJournalDate(date)}</Text>
             <Text style={styles.title}>{heading}</Text>
             <TextInput
               accessibilityLabel="Task title"
               autoFocus
               maxLength={80}
+              onBlur={() => setInputFocused(false)}
               onChangeText={setTitle}
+              onFocus={() => setInputFocused(true)}
               onSubmitEditing={submit}
               placeholder="What needs to be done?"
               placeholderTextColor="#9c9b96"
               returnKeyType="done"
               selectTextOnFocus={Boolean(initialTitle)}
               selectionColor="#111111"
-              style={styles.input}
+              style={[
+                styles.input,
+                Platform.OS === 'web' && styles.inputWeb,
+                Platform.OS === 'web' &&
+                  inputFocused &&
+                  styles.inputWebFocused,
+              ]}
               value={title}
             />
             <View style={styles.actions}>
@@ -103,8 +114,8 @@ export function TaskComposer({
                 <Text style={styles.addText}>{submitLabel}</Text>
               </Pressable>
             </View>
-          </Pressable>
-        </Pressable>
+          </View>
+        </View>
       </KeyboardAvoidingView>
     </Modal>
   );
@@ -120,6 +131,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.42)',
   },
   sheet: {
+    width: '100%',
+    maxWidth: 560,
+    alignSelf: 'center',
     backgroundColor: '#fbfbf9',
     paddingHorizontal: 24,
     paddingTop: 28,
@@ -147,6 +161,12 @@ const styles = StyleSheet.create({
     fontFamily: 'SpaceMono_400Regular',
     fontSize: 15,
     paddingVertical: 12,
+  },
+  inputWeb: {
+    outlineWidth: 0,
+  },
+  inputWebFocused: {
+    borderBottomWidth: 2,
   },
   actions: {
     marginTop: 24,

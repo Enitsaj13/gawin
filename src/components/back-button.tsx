@@ -1,4 +1,4 @@
-import { StyleSheet, Text } from 'react-native';
+import { Platform, StyleSheet, Text } from 'react-native';
 
 export function BackButton() {
   return (
@@ -15,6 +15,6 @@ const styles = StyleSheet.create({
     fontSize: 42,
     lineHeight: 44,
     textAlignVertical: 'center',
-    transform: [{ translateY: 4 }],
+    transform: [{ translateY: Platform.OS === 'web' ? -3 : 4 }],
   },
 });
