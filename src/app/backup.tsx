@@ -1,14 +1,10 @@
-import * as DocumentPicker from 'expo-document-picker';
-import { File, Paths } from 'expo-file-system';
 import { router } from 'expo-router';
-import * as Sharing from 'expo-sharing';
 import { StatusBar } from 'expo-status-bar';
 import { useState } from 'react';
 import {
   Platform,
   Pressable,
   ScrollView,
-  Share,
   StyleSheet,
   Text,
   View,
@@ -23,6 +19,10 @@ import {
   TodoBackup,
 } from '@/features/todos/backup';
 import { BackupImportSheet } from '@/features/todos/backup-import-sheet';
+import {
+  exportBackupFile,
+  pickBackupFile,
+} from '@/features/todos/backup-file';
 import { useTodos } from '@/features/todos/todos-context';
 import { todayKey } from '@/lib/date';
 
@@ -32,35 +32,6 @@ type SelectedBackup = {
   backup: TodoBackup;
   fileName: string;
 };
-
-type ShareResult = 'dismissed' | 'shared' | 'unknown';
-
-async function shareBackupFile(file: File): Promise<ShareResult> {
-  if (Platform.OS === 'ios') {
-    const result = await Share.share(
-      { url: file.uri },
-      { subject: 'Gawin backup' },
-    );
-
-    return result.action === Share.sharedAction ? 'shared' : 'dismissed';
-  }
-
-  await Sharing.shareAsync(file.uri, {
-    dialogTitle: 'Save Gawin backup',
-    mimeType: 'application/json',
-    UTI: 'public.json',
-  });
-
-  return 'unknown';
-}
-
-function removeTemporaryFile(file: File) {
-  try {
-    if (file.exists) file.delete();
-  } catch {
-    // The operating system can clear an undeleted cache file later.
-  }
-}
 
 export default function BackupScreen() {
   const [busyAction, setBusyAction] = useState<'export' | 'import' | null>(
@@ -79,24 +50,12 @@ export default function BackupScreen() {
     setError(null);
 
     try {
-      if (!(await Sharing.isAvailableAsync())) {
-        throw new Error('File sharing is not available on this device.');
-      }
-
       const backup = createBackup();
-      const file = new File(
-        Paths.cache,
+      const exported = await exportBackupFile(
+        backup,
         `gawin-backup-${todayKey()}.json`,
       );
-      file.create({ overwrite: true });
-      await file.write(JSON.stringify(backup, null, 2));
-      const result = await shareBackupFile(file);
-
-      if (result === 'shared') {
-        showToast('Backup exported', 'backup');
-      } else if (result === 'dismissed') {
-        removeTemporaryFile(file);
-      }
+      if (exported) showToast('Backup exported', 'backup');
     } catch (caughtError) {
       setError(getErrorMessage(caughtError, 'Unable to export your backup.'));
     } finally {
@@ -110,23 +69,17 @@ export default function BackupScreen() {
     setError(null);
 
     try {
-      const result = await DocumentPicker.getDocumentAsync({
-        copyToCacheDirectory: true,
-        multiple: false,
-        type: ['application/json', 'text/json'],
-      });
-      if (result.canceled) return;
+      const file = await pickBackupFile();
+      if (!file) return;
 
-      const asset = result.assets[0];
-      if (asset.size && asset.size > MAX_BACKUP_FILE_SIZE) {
+      if (file.size && file.size > MAX_BACKUP_FILE_SIZE) {
         throw new BackupValidationError(
           'This backup is too large to import safely.',
         );
       }
 
-      const content = await new File(asset.uri).text();
-      const backup = parseTodoBackup(content);
-      setSelectedBackup({ backup, fileName: asset.name });
+      const backup = parseTodoBackup(file.content);
+      setSelectedBackup({ backup, fileName: file.fileName });
     } catch (caughtError) {
       setError(getErrorMessage(caughtError, 'Unable to open this backup.'));
     } finally {
@@ -189,8 +142,9 @@ export default function BackupScreen() {
             <Text style={styles.eyebrow}>Export</Text>
             <Text style={styles.sectionTitle}>Create a backup file</Text>
             <Text style={styles.sectionBody}>
-              Save it to Files, iCloud Drive, Google Drive, or send it with
-              AirDrop.
+              {Platform.OS === 'web'
+                ? 'Download a JSON copy you can keep in Files, Drive, or another private folder.'
+                : 'Save it to Files, iCloud Drive, Google Drive, or send it with AirDrop.'}
             </Text>
             <Pressable
               accessibilityLabel="Export backup file"

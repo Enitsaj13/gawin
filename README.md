@@ -17,6 +17,7 @@ The name comes from the Filipino word _gawin_—to do or get something done.
 - Daily repeating tasks for simple routines
 - Minimalist action sheets, toast messages, and tactile feedback
 - Fully offline storage with no account required
+- Installable PWA support for iPhone, Android, and desktop browsers
 - Manual JSON backup and restore using files you control
 - Safe backup previews with merge and replace options
 
@@ -59,6 +60,32 @@ npx expo start
 From the Expo terminal, scan the QR code with Expo Go or select an available
 simulator or emulator.
 
+### Run the web app
+
+```bash
+# Start the browser development server
+pnpm web
+
+# Create the installable, offline production build
+pnpm build:web
+
+# Preview the production build locally
+pnpm serve:web
+```
+
+The production build is written to `dist/`. Deploy that directory to an HTTPS
+host, then open the URL in Safari and choose **Add to Home Screen** to install
+Gawin as a standalone web app. The native iOS and Android apps remain part of
+the same Expo Router codebase.
+
+### Deploy to Vercel
+
+Import this repository into Vercel or run `npx vercel@latest` from the project
+root. The included `vercel.json` runs the PWA build, publishes `dist/`, and
+rewrites Expo Router paths to the single-page app entry point. Use the stable
+production URL when installing Gawin because browser storage is scoped to its
+domain.
+
 ## Development commands
 
 ```bash
@@ -73,6 +100,9 @@ npx tsc --noEmit
 
 # Check the Expo project configuration and dependencies
 npx expo-doctor
+
+# Build the offline PWA
+pnpm build:web
 ```
 
 ## Project structure

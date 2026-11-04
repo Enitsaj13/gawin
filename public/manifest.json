@@ -1,0 +1,26 @@
+{
+  "id": "/",
+  "name": "Gawin",
+  "short_name": "Gawin",
+  "description": "A minimalist, offline-first task app focused on today.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#fbfbf9",
+  "theme_color": "#fbfbf9",
+  "icons": [
+    {
+      "src": "/gawin-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/gawin-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
