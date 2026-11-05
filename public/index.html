@@ -5,7 +5,7 @@
     <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
     <meta
       name="viewport"
-      content="width=device-width, initial-scale=1, viewport-fit=cover"
+      content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
     />
     <meta name="application-name" content="Gawin" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -44,6 +44,11 @@
         height: 100%;
         flex: 1;
         overflow: hidden;
+      }
+      html,
+      body,
+      #root {
+        touch-action: pan-y;
       }
       input,
       textarea,
