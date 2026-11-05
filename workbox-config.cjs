@@ -1,4 +1,5 @@
 module.exports = {
+  clientsClaim: true,
   cleanupOutdatedCaches: true,
   globDirectory: 'dist',
   globPatterns: [
@@ -6,5 +7,6 @@ module.exports = {
   ],
   navigateFallback: '/index.html',
   navigateFallbackDenylist: [/^\/_expo\//],
+  skipWaiting: true,
   swDest: 'dist/sw.js',
 };

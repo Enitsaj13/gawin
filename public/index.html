@@ -70,8 +70,22 @@
         location.hostname === '127.0.0.1';
 
       if ('serviceWorker' in navigator && canUseServiceWorker) {
+        let isRefreshing = false;
+
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          if (isRefreshing) {
+            return;
+          }
+
+          isRefreshing = true;
+          window.location.reload();
+        });
+
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js').catch(() => undefined);
+          navigator.serviceWorker
+            .register('/sw.js', { updateViaCache: 'none' })
+            .then((registration) => registration.update())
+            .catch(() => undefined);
         });
       }
     </script>
