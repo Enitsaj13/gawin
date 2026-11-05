@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Modal,
@@ -33,6 +33,42 @@ export function TaskComposer({
 }: TaskComposerProps) {
   const [title, setTitle] = useState(initialTitle);
   const [inputFocused, setInputFocused] = useState(false);
+  const [webKeyboardInset, setWebKeyboardInset] = useState(0);
+  const webLayoutHeightRef = useRef(0);
+
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof window === 'undefined') return;
+
+    const viewport = window.visualViewport;
+    const updateKeyboardInset = () => {
+      const layoutHeight = Math.max(
+        webLayoutHeightRef.current,
+        window.innerHeight,
+        document.documentElement.clientHeight,
+      );
+      webLayoutHeightRef.current = layoutHeight;
+
+      setWebKeyboardInset(
+        viewport
+          ? Math.max(
+              0,
+              layoutHeight - viewport.height - viewport.offsetTop,
+            )
+          : 0,
+      );
+    };
+
+    updateKeyboardInset();
+    viewport?.addEventListener('resize', updateKeyboardInset);
+    viewport?.addEventListener('scroll', updateKeyboardInset);
+    window.addEventListener('resize', updateKeyboardInset);
+
+    return () => {
+      viewport?.removeEventListener('resize', updateKeyboardInset);
+      viewport?.removeEventListener('scroll', updateKeyboardInset);
+      window.removeEventListener('resize', updateKeyboardInset);
+    };
+  }, []);
 
   const close = () => {
     setTitle('');
@@ -53,10 +89,21 @@ export function TaskComposer({
       visible={visible}
     >
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={
+          Platform.OS === 'web'
+            ? undefined
+            : Platform.OS === 'ios'
+              ? 'padding'
+              : 'height'
+        }
         style={styles.keyboardView}
       >
-        <View style={styles.backdrop}>
+        <View
+          style={[
+            styles.backdrop,
+            Platform.OS === 'web' && { paddingBottom: webKeyboardInset },
+          ]}
+        >
           <Pressable
             accessibilityLabel="Close task editor"
             accessibilityRole="button"
