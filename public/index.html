@@ -25,10 +25,12 @@
         width: 100%;
         max-width: 100%;
         height: 100%;
-        overflow-x: hidden;
+        overflow: hidden;
       }
       /* These styles disable body scrolling if you are using <ScrollView> */
       body {
+        position: fixed;
+        inset: 0;
         overflow: hidden;
         margin: 0;
         background: #fbfbf9;
@@ -41,7 +43,7 @@
         max-width: 100%;
         height: 100%;
         flex: 1;
-        overflow-x: hidden;
+        overflow: hidden;
       }
       input,
       textarea,

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Modal,
@@ -22,6 +22,13 @@ type TaskComposerProps = {
   onSubmit: (title: string) => void;
 };
 
+type WebViewport = {
+  height: number;
+  left: number;
+  top: number;
+  width: number;
+};
+
 export function TaskComposer({
   date,
   heading = 'New task',
@@ -33,40 +40,30 @@ export function TaskComposer({
 }: TaskComposerProps) {
   const [title, setTitle] = useState(initialTitle);
   const [inputFocused, setInputFocused] = useState(false);
-  const [webKeyboardInset, setWebKeyboardInset] = useState(0);
-  const webLayoutHeightRef = useRef(0);
+  const [webViewport, setWebViewport] = useState<WebViewport | null>(null);
 
   useEffect(() => {
     if (Platform.OS !== 'web' || typeof window === 'undefined') return;
 
     const viewport = window.visualViewport;
-    const updateKeyboardInset = () => {
-      const layoutHeight = Math.max(
-        webLayoutHeightRef.current,
-        window.innerHeight,
-        document.documentElement.clientHeight,
-      );
-      webLayoutHeightRef.current = layoutHeight;
-
-      setWebKeyboardInset(
-        viewport
-          ? Math.max(
-              0,
-              layoutHeight - viewport.height - viewport.offsetTop,
-            )
-          : 0,
-      );
+    const updateViewport = () => {
+      setWebViewport({
+        height: viewport?.height ?? window.innerHeight,
+        left: viewport?.offsetLeft ?? 0,
+        top: viewport?.offsetTop ?? 0,
+        width: viewport?.width ?? window.innerWidth,
+      });
     };
 
-    updateKeyboardInset();
-    viewport?.addEventListener('resize', updateKeyboardInset);
-    viewport?.addEventListener('scroll', updateKeyboardInset);
-    window.addEventListener('resize', updateKeyboardInset);
+    updateViewport();
+    viewport?.addEventListener('resize', updateViewport);
+    viewport?.addEventListener('scroll', updateViewport);
+    window.addEventListener('resize', updateViewport);
 
     return () => {
-      viewport?.removeEventListener('resize', updateKeyboardInset);
-      viewport?.removeEventListener('scroll', updateKeyboardInset);
-      window.removeEventListener('resize', updateKeyboardInset);
+      viewport?.removeEventListener('resize', updateViewport);
+      viewport?.removeEventListener('scroll', updateViewport);
+      window.removeEventListener('resize', updateViewport);
     };
   }, []);
 
@@ -96,14 +93,20 @@ export function TaskComposer({
               ? 'padding'
               : 'height'
         }
-        style={styles.keyboardView}
+        style={[
+          styles.keyboardView,
+          Platform.OS === 'web' &&
+            webViewport && {
+              flex: 0,
+              position: 'absolute',
+              height: webViewport.height,
+              left: webViewport.left,
+              top: webViewport.top,
+              width: webViewport.width,
+            },
+        ]}
       >
-        <View
-          style={[
-            styles.backdrop,
-            Platform.OS === 'web' && { paddingBottom: webKeyboardInset },
-          ]}
-        >
+        <View style={styles.backdrop}>
           <Pressable
             accessibilityLabel="Close task editor"
             accessibilityRole="button"
