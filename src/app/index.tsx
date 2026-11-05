@@ -61,20 +61,30 @@ export default function HomeScreen() {
                   ) : null}
                 </View>
                 <Pressable
-                  accessibilityLabel={`Open past tasks. ${pastDateCount} saved ${pastDateCount === 1 ? 'day' : 'days'}.`}
+                  accessibilityLabel={
+                    pastDateCount
+                      ? `Open past tasks. ${pastDateCount} saved ${pastDateCount === 1 ? 'day' : 'days'}.`
+                      : 'Open backup and restore'
+                  }
                   accessibilityRole="button"
                   hitSlop={8}
-                  onPress={() => router.navigate('/history')}
+                  onPress={() =>
+                    router.navigate(pastDateCount ? '/history' : '/backup')
+                  }
                   style={({ pressed }) => [
-                    styles.historyButton,
+                    styles.headerAction,
                     pressed && styles.buttonPressed,
                   ]}
                 >
-                  <Text style={styles.historyText}>Past tasks</Text>
+                  <Text style={styles.headerActionText}>
+                    {pastDateCount ? 'Past tasks' : 'Backup'}
+                  </Text>
                   {pastDateCount ? (
-                    <Text style={styles.historyCount}>{pastDateCount}</Text>
+                    <Text style={styles.headerActionCount}>
+                      {pastDateCount}
+                    </Text>
                   ) : null}
-                  <Text style={styles.historyArrow}>→</Text>
+                  <Text style={styles.headerActionArrow}>→</Text>
                 </Pressable>
               </View>
             </View>
@@ -216,7 +226,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
     gap: 11,
   },
-  historyButton: {
+  headerAction: {
     minHeight: 28,
     flexDirection: 'row',
     alignItems: 'center',
@@ -224,19 +234,19 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderColor: '#2f2f2d',
   },
-  historyText: {
+  headerActionText: {
     color: '#343432',
     fontFamily: 'SpaceMono_700Bold',
     fontSize: 10,
   },
-  historyCount: {
+  headerActionCount: {
     minWidth: 16,
     color: '#888781',
     fontFamily: 'SpaceMono_400Regular',
     fontSize: 9,
     textAlign: 'center',
   },
-  historyArrow: {
+  headerActionArrow: {
     color: '#343432',
     fontFamily: 'SpaceMono_400Regular',
     fontSize: 13,
