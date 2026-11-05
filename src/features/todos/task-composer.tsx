@@ -9,6 +9,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import type { ViewStyle } from 'react-native';
 
 import { formatJournalDate } from '@/lib/date';
 
@@ -27,6 +28,10 @@ type WebViewport = {
   left: number;
   top: number;
   width: number;
+};
+
+const webScrollLockStyle: ViewStyle & { touchAction: 'none' } = {
+  touchAction: 'none',
 };
 
 export function TaskComposer({
@@ -106,7 +111,12 @@ export function TaskComposer({
             },
         ]}
       >
-        <View style={styles.backdrop}>
+        <View
+          style={[
+            styles.backdrop,
+            Platform.OS === 'web' && webScrollLockStyle,
+          ]}
+        >
           <Pressable
             accessibilityLabel="Close task editor"
             accessibilityRole="button"

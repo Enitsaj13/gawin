@@ -42,6 +42,7 @@ export default function HomeScreen() {
       <View style={styles.page}>
         <ScrollView
           contentContainerStyle={styles.scrollContent}
+          scrollEnabled={!composer}
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.todaySection}>
