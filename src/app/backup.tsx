@@ -13,6 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BackButton } from '@/components/back-button';
 import { useToast } from '@/components/toast';
+import { usePreferences } from '@/features/preferences/preferences-context';
 import {
   BackupValidationError,
   parseTodoBackup,
@@ -43,6 +44,7 @@ export default function BackupScreen() {
   );
   const { activeRepeatCount, createBackup, restoreBackup, todos } = useTodos();
   const { showToast } = useToast();
+  const { backupDue, markBackupExported, preferences } = usePreferences();
 
   const exportBackup = async () => {
     if (busyAction) return;
@@ -55,7 +57,10 @@ export default function BackupScreen() {
         backup,
         `gawin-backup-${todayKey()}.json`,
       );
-      if (exported) showToast('Backup exported', 'backup');
+      if (exported) {
+        markBackupExported();
+        showToast('Backup exported', 'backup');
+      }
     } catch (caughtError) {
       setError(getErrorMessage(caughtError, 'Unable to export your backup.'));
     } finally {
@@ -99,7 +104,7 @@ export default function BackupScreen() {
             accessibilityRole="button"
             hitSlop={12}
             onPress={() =>
-              router.canGoBack() ? router.back() : router.replace('/history')
+              router.canGoBack() ? router.back() : router.replace('/settings')
             }
             style={({ pressed }) => [
               styles.backButton,
@@ -120,6 +125,13 @@ export default function BackupScreen() {
           <Text style={styles.intro}>
             Export your tasks to a file you control. No account or internet
             connection is required.
+          </Text>
+          <Text style={[styles.backupStatus, backupDue && styles.backupDue]}>
+            {preferences.lastBackupAt
+              ? `Last backup: ${formatBackupDate(preferences.lastBackupAt)}`
+              : backupDue
+                ? 'No recent backup. A new copy is recommended.'
+                : 'No backup created on this device yet.'}
           </Text>
 
           <View style={styles.deviceSummary}>
@@ -219,6 +231,14 @@ function getErrorMessage(error: unknown, fallback: string) {
   return error instanceof Error && error.message ? error.message : fallback;
 }
 
+function formatBackupDate(value: string) {
+  return new Date(value).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+}
+
 function ExportIcon() {
   return (
     <View style={styles.icon}>
@@ -298,6 +318,16 @@ const styles = StyleSheet.create({
     fontFamily: 'SpaceMono_400Regular',
     fontSize: 11,
     lineHeight: 18,
+  },
+  backupStatus: {
+    marginTop: 11,
+    color: '#8a8984',
+    fontFamily: 'SpaceMono_400Regular',
+    fontSize: 9,
+  },
+  backupDue: {
+    color: '#343432',
+    fontFamily: 'SpaceMono_700Bold',
   },
   deviceSummary: {
     minHeight: 72,

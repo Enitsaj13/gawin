@@ -1,17 +1,37 @@
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import {
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { AppMenuSheet } from '@/components/app-menu-sheet';
 import { BackButton } from '@/components/back-button';
 import { DayCard } from '@/features/todos/day-card';
 import { useTodos } from '@/features/todos/todos-context';
 
 export default function HistoryScreen() {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [query, setQuery] = useState('');
   const { getTodosForDate, today, todos, toggleTodo } = useTodos();
   const pastDates = [...new Set(todos.map((todo) => todo.date))]
     .filter((date) => date < today)
     .sort((first, second) => second.localeCompare(first));
+  const normalizedQuery = query.trim().toLocaleLowerCase();
+  const matchingTodos = (date: string) =>
+    getTodosForDate(date).filter(
+      (todo) =>
+        !normalizedQuery ||
+        todo.title.toLocaleLowerCase().includes(normalizedQuery),
+    );
+  const visibleDates = pastDates.filter((date) => matchingTodos(date).length);
 
   return (
     <SafeAreaView edges={['top', 'bottom']} style={styles.safeArea}>
@@ -38,28 +58,46 @@ export default function HistoryScreen() {
               {pastDates.length} {pastDates.length === 1 ? 'day' : 'days'}
             </Text>
             <Pressable
-              accessibilityLabel="Open backup and restore"
+              accessibilityLabel="Open Gawin menu"
               accessibilityRole="button"
               hitSlop={8}
-              onPress={() => router.push('/backup')}
+              onPress={() => setMenuOpen(true)}
               style={({ pressed }) => [
-                styles.backupButton,
+                styles.menuAction,
                 pressed && styles.pressed,
               ]}
             >
-              <Text style={styles.backupText}>Backup</Text>
-              <Text style={styles.backupArrow}>→</Text>
+              <Text style={styles.menuActionText}>Menu →</Text>
             </Pressable>
           </View>
         </View>
 
         {pastDates.length ? (
+          <View style={styles.searchWrap}>
+            <TextInput
+              accessibilityLabel="Search past tasks"
+              autoCapitalize="none"
+              autoCorrect={false}
+              clearButtonMode="while-editing"
+              maxLength={80}
+              onChangeText={setQuery}
+              placeholder="Search past tasks"
+              placeholderTextColor="#979691"
+              returnKeyType="search"
+              selectionColor="#111111"
+              style={[styles.searchInput, Platform.OS === 'web' && styles.searchInputWeb]}
+              value={query}
+            />
+          </View>
+        ) : null}
+
+        {visibleDates.length ? (
           <ScrollView
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}
           >
             <View style={styles.dayGrid}>
-              {pastDates.map((date) => (
+              {visibleDates.map((date) => (
                 <DayCard
                   date={date}
                   key={date}
@@ -67,20 +105,25 @@ export default function HistoryScreen() {
                     router.push({ pathname: '/day/[date]', params: { date } })
                   }
                   onToggle={toggleTodo}
-                  todos={getTodosForDate(date)}
+                  todos={matchingTodos(date)}
                 />
               ))}
             </View>
           </ScrollView>
         ) : (
           <View style={styles.emptyState}>
-            <Text style={styles.emptyTitle}>No past tasks.</Text>
+            <Text style={styles.emptyTitle}>
+              {pastDates.length ? 'No matching tasks.' : 'No past tasks.'}
+            </Text>
             <Text style={styles.emptyBody}>
-              Completed days will appear here.
+              {pastDates.length
+                ? 'Try another word.'
+                : 'Completed days will appear here.'}
             </Text>
           </View>
         )}
       </View>
+      {menuOpen ? <AppMenuSheet onClose={() => setMenuOpen(false)} /> : null}
     </SafeAreaView>
   );
 }
@@ -126,24 +169,32 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
     gap: 7,
   },
-  backupButton: {
-    minHeight: 22,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
+  menuAction: {
+    minHeight: 24,
+    justifyContent: 'center',
     borderBottomWidth: 1,
-    borderColor: '#242422',
+    borderColor: '#2f2f2d',
   },
-  backupText: {
-    color: '#242422',
+  menuActionText: {
+    color: '#343432',
     fontFamily: 'SpaceMono_700Bold',
     fontSize: 9,
   },
-  backupArrow: {
+  searchWrap: {
+    paddingHorizontal: 24,
+    paddingBottom: 18,
+  },
+  searchInput: {
+    minHeight: 42,
+    borderBottomWidth: 1,
+    borderColor: '#8d8c87',
     color: '#242422',
     fontFamily: 'SpaceMono_400Regular',
-    fontSize: 12,
-    lineHeight: 15,
+    fontSize: 11,
+    paddingVertical: 10,
+  },
+  searchInputWeb: {
+    outlineWidth: 0,
   },
   scrollContent: {
     paddingBottom: 28,
