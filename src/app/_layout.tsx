@@ -3,7 +3,7 @@ import {
   SpaceMono_700Bold,
   useFonts,
 } from '@expo-google-fonts/space-mono';
-import { Stack } from 'expo-router';
+import { Stack, type SuspenseFallbackProps } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect, useState } from 'react';
 import { Appearance, Platform, View } from 'react-native';
@@ -15,6 +15,7 @@ import {
   usePreferences,
 } from '@/features/preferences/preferences-context';
 import { LoadingScreen } from '@/features/todos/loading-screen';
+import { NavigationSkeleton } from '@/features/todos/navigation-skeleton';
 import { TodosProvider, useTodos } from '@/features/todos/todos-context';
 import { useAppTheme } from '@/theme/theme';
 
@@ -23,6 +24,7 @@ SplashScreen.setOptions({ duration: 220, fade: true });
 
 function AppNavigator() {
   const { isReady } = useTodos();
+  const { colors } = useAppTheme();
   const [launchFinished, setLaunchFinished] = useState(false);
 
   if (!launchFinished) {
@@ -34,7 +36,37 @@ function AppNavigator() {
     );
   }
 
-  return <Stack screenOptions={{ headerShown: false, animation: 'fade' }} />;
+  return (
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          animation: 'none',
+          contentStyle: { backgroundColor: colors.background },
+        }}
+      />
+    </View>
+  );
+}
+
+export function SuspenseFallback(_props: SuspenseFallbackProps) {
+  return <DelayedNavigationSkeleton />;
+}
+
+function DelayedNavigationSkeleton() {
+  const { colors } = useAppTheme();
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setVisible(true), 120);
+    return () => clearTimeout(timer);
+  }, []);
+
+  return visible ? (
+    <NavigationSkeleton />
+  ) : (
+    <View style={{ flex: 1, backgroundColor: colors.background }} />
+  );
 }
 
 function ThemedApp() {
