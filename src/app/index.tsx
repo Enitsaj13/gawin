@@ -79,24 +79,6 @@ export default function HomeScreen() {
                   ) : null}
                 </View>
                 <View style={styles.headerLinks}>
-                  {pastDateCount ? (
-                    <Pressable
-                      accessibilityLabel={`Open past tasks. ${pastDateCount} saved ${pastDateCount === 1 ? 'day' : 'days'}.`}
-                      accessibilityRole="button"
-                      hitSlop={8}
-                      onPress={() => router.navigate('/history')}
-                      style={({ pressed }) => [
-                        styles.headerAction,
-                        pressed && styles.buttonPressed,
-                      ]}
-                    >
-                      <Text style={styles.headerActionText}>Past tasks</Text>
-                      <Text style={styles.headerActionCount}>
-                        {pastDateCount}
-                      </Text>
-                      <Text style={styles.headerActionArrow}>→</Text>
-                    </Pressable>
-                  ) : null}
                   <Pressable
                     accessibilityLabel="Open Gawin menu"
                     accessibilityRole="button"
@@ -215,7 +197,12 @@ export default function HomeScreen() {
         />
       ) : null}
 
-      {menuOpen ? <AppMenuSheet onClose={() => setMenuOpen(false)} /> : null}
+      {menuOpen ? (
+        <AppMenuSheet
+          onClose={() => setMenuOpen(false)}
+          pastDateCount={pastDateCount}
+        />
+      ) : null}
     </SafeAreaView>
   );
 }
@@ -286,18 +273,8 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
     gap: 11,
   },
-  headerAction: {
-    minHeight: 28,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    borderBottomWidth: 1,
-    borderColor: '#2f2f2d',
-  },
   headerLinks: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 9,
+    alignItems: 'flex-end',
   },
   menuAction: {
     minHeight: 28,
@@ -309,23 +286,6 @@ const styles = StyleSheet.create({
     color: '#343432',
     fontFamily: 'SpaceMono_700Bold',
     fontSize: 9,
-  },
-  headerActionText: {
-    color: '#343432',
-    fontFamily: 'SpaceMono_700Bold',
-    fontSize: 10,
-  },
-  headerActionCount: {
-    minWidth: 16,
-    color: '#888781',
-    fontFamily: 'SpaceMono_400Regular',
-    fontSize: 9,
-    textAlign: 'center',
-  },
-  headerActionArrow: {
-    color: '#343432',
-    fontFamily: 'SpaceMono_400Regular',
-    fontSize: 13,
   },
   backupDue: {
     color: '#777671',

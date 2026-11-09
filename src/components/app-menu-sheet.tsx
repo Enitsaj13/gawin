@@ -18,9 +18,13 @@ import {
 
 type AppMenuSheetProps = {
   onClose: () => void;
+  pastDateCount?: number;
 };
 
-export function AppMenuSheet({ onClose }: AppMenuSheetProps) {
+export function AppMenuSheet({
+  onClose,
+  pastDateCount = 0,
+}: AppMenuSheetProps) {
   const insets = useSafeAreaInsets();
   const feedback = useFeedback();
   const { preferences } = usePreferences();
@@ -45,7 +49,7 @@ export function AppMenuSheet({ onClose }: AppMenuSheetProps) {
     ]).start();
   }, [backdropOpacity, preferences.reducedMotion, translateY]);
 
-  const dismiss = (destination?: '/defaults' | '/settings') => {
+  const dismiss = (destination?: '/defaults' | '/history' | '/settings') => {
     if (closingRef.current) return;
     closingRef.current = true;
 
@@ -68,7 +72,7 @@ export function AppMenuSheet({ onClose }: AppMenuSheetProps) {
     });
   };
 
-  const navigate = (destination: '/defaults' | '/settings') => {
+  const navigate = (destination: '/defaults' | '/history' | '/settings') => {
     feedback.selection();
     dismiss(destination);
   };
@@ -107,6 +111,28 @@ export function AppMenuSheet({ onClose }: AppMenuSheetProps) {
             <Text style={styles.title}>More</Text>
 
             <View style={styles.actionList}>
+              {pastDateCount ? (
+                <Pressable
+                  accessibilityLabel={`Open past tasks. ${pastDateCount} saved ${pastDateCount === 1 ? 'day' : 'days'}.`}
+                  accessibilityRole="button"
+                  onPress={() => navigate('/history')}
+                  style={({ pressed }) => [
+                    styles.actionRow,
+                    pressed && styles.pressed,
+                  ]}
+                >
+                  <HistoryIcon />
+                  <View style={styles.actionCopy}>
+                    <Text style={styles.actionText}>Past tasks</Text>
+                    <Text style={styles.actionMeta}>
+                      {pastDateCount}{' '}
+                      {pastDateCount === 1 ? 'saved day' : 'saved days'}
+                    </Text>
+                  </View>
+                  <Text style={styles.arrow}>→</Text>
+                </Pressable>
+              ) : null}
+
               <Pressable
                 accessibilityLabel="Open daily defaults"
                 accessibilityRole="button"
@@ -161,6 +187,16 @@ export function AppMenuSheet({ onClose }: AppMenuSheetProps) {
         </Animated.View>
       </View>
     </Modal>
+  );
+}
+
+function HistoryIcon() {
+  return (
+    <View style={styles.icon}>
+      <View style={styles.historyPage} />
+      <View style={[styles.historyLine, styles.historyLineTop]} />
+      <View style={[styles.historyLine, styles.historyLineBottom]} />
+    </View>
   );
 }
 
@@ -261,6 +297,29 @@ const styles = StyleSheet.create({
   icon: {
     width: 14,
     height: 14,
+  },
+  historyPage: {
+    position: 'absolute',
+    top: 1,
+    right: 1,
+    bottom: 1,
+    left: 1,
+    borderWidth: 1.2,
+    borderColor: '#242422',
+  },
+  historyLine: {
+    position: 'absolute',
+    left: 4,
+    height: 1.2,
+    backgroundColor: '#242422',
+  },
+  historyLineTop: {
+    top: 5,
+    width: 6,
+  },
+  historyLineBottom: {
+    top: 8,
+    width: 4,
   },
   repeatTopLine: {
     position: 'absolute',
