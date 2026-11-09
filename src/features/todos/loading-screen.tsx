@@ -1,12 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, StyleSheet, View } from 'react-native';
 
+import { usePreferences } from '@/features/preferences/preferences-context';
+
 type LoadingScreenProps = {
   ready: boolean;
   onFinished: () => void;
 };
 
 export function LoadingScreen({ ready, onFinished }: LoadingScreenProps) {
+  const { preferences } = usePreferences();
   const [minimumElapsed, setMinimumElapsed] = useState(false);
   const [contentOpacity] = useState(() => new Animated.Value(1));
   const [fillScale] = useState(() => new Animated.Value(0));
@@ -23,13 +26,13 @@ export function LoadingScreen({ ready, onFinished }: LoadingScreenProps) {
   useEffect(() => {
     const intro = Animated.parallel([
       Animated.timing(iconOpacity, {
-        duration: 180,
+        duration: preferences.reducedMotion ? 0 : 180,
         easing: Easing.out(Easing.quad),
         toValue: 1,
         useNativeDriver: true,
       }),
       Animated.timing(iconScale, {
-        duration: 240,
+        duration: preferences.reducedMotion ? 0 : 240,
         easing: Easing.out(Easing.cubic),
         toValue: 1,
         useNativeDriver: true,
@@ -37,12 +40,15 @@ export function LoadingScreen({ ready, onFinished }: LoadingScreenProps) {
     ]);
     intro.start();
 
-    const timer = setTimeout(() => setMinimumElapsed(true), 300);
+    const timer = setTimeout(
+      () => setMinimumElapsed(true),
+      preferences.reducedMotion ? 0 : 300,
+    );
     return () => {
       clearTimeout(timer);
       intro.stop();
     };
-  }, [iconOpacity, iconScale]);
+  }, [iconOpacity, iconScale, preferences.reducedMotion]);
 
   useEffect(() => {
     if (!ready || !minimumElapsed || finishingRef.current) return;
@@ -50,35 +56,35 @@ export function LoadingScreen({ ready, onFinished }: LoadingScreenProps) {
 
     const finish = Animated.sequence([
       Animated.timing(fillScale, {
-        duration: 210,
+        duration: preferences.reducedMotion ? 0 : 210,
         easing: Easing.out(Easing.cubic),
         toValue: 1,
         useNativeDriver: true,
       }),
       Animated.parallel([
         Animated.timing(checkOpacity, {
-          duration: 130,
+          duration: preferences.reducedMotion ? 0 : 130,
           easing: Easing.out(Easing.quad),
           toValue: 1,
           useNativeDriver: true,
         }),
         Animated.sequence([
           Animated.timing(iconScale, {
-            duration: 90,
+            duration: preferences.reducedMotion ? 0 : 90,
             toValue: 1.04,
             useNativeDriver: true,
           }),
           Animated.timing(iconScale, {
-            duration: 110,
+            duration: preferences.reducedMotion ? 0 : 110,
             easing: Easing.out(Easing.quad),
             toValue: 1,
             useNativeDriver: true,
           }),
         ]),
       ]),
-      Animated.delay(100),
+      Animated.delay(preferences.reducedMotion ? 0 : 100),
       Animated.timing(contentOpacity, {
-        duration: 180,
+        duration: preferences.reducedMotion ? 0 : 180,
         easing: Easing.in(Easing.quad),
         toValue: 0,
         useNativeDriver: true,
@@ -96,6 +102,7 @@ export function LoadingScreen({ ready, onFinished }: LoadingScreenProps) {
     fillScale,
     iconScale,
     minimumElapsed,
+    preferences.reducedMotion,
     ready,
   ]);
 

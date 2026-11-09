@@ -1,4 +1,3 @@
-import * as Haptics from 'expo-haptics';
 import { useEffect, useRef, useState } from 'react';
 import {
   Animated,
@@ -10,6 +9,11 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+import {
+  useFeedback,
+  usePreferences,
+} from '@/features/preferences/preferences-context';
 
 import { TodoBackup } from './backup';
 
@@ -29,6 +33,8 @@ export function BackupImportSheet({
   onReplace,
 }: BackupImportSheetProps) {
   const insets = useSafeAreaInsets();
+  const feedback = useFeedback();
+  const { preferences } = usePreferences();
   const [confirmingReplace, setConfirmingReplace] = useState(false);
   const [backdropOpacity] = useState(() => new Animated.Value(0));
   const [translateY] = useState(() => new Animated.Value(36));
@@ -40,19 +46,19 @@ export function BackupImportSheet({
   useEffect(() => {
     Animated.parallel([
       Animated.timing(backdropOpacity, {
-        duration: 180,
+        duration: preferences.reducedMotion ? 0 : 180,
         easing: Easing.out(Easing.quad),
         toValue: 1,
         useNativeDriver: true,
       }),
       Animated.timing(translateY, {
-        duration: 220,
+        duration: preferences.reducedMotion ? 0 : 220,
         easing: Easing.out(Easing.cubic),
         toValue: 0,
         useNativeDriver: true,
       }),
     ]).start();
-  }, [backdropOpacity, translateY]);
+  }, [backdropOpacity, preferences.reducedMotion, translateY]);
 
   const dismiss = (afterClose?: () => void) => {
     if (closingRef.current) return;
@@ -60,13 +66,13 @@ export function BackupImportSheet({
 
     Animated.parallel([
       Animated.timing(backdropOpacity, {
-        duration: 150,
+        duration: preferences.reducedMotion ? 0 : 150,
         easing: Easing.in(Easing.quad),
         toValue: 0,
         useNativeDriver: true,
       }),
       Animated.timing(translateY, {
-        duration: 170,
+        duration: preferences.reducedMotion ? 0 : 170,
         easing: Easing.in(Easing.cubic),
         toValue: 36,
         useNativeDriver: true,
@@ -78,9 +84,7 @@ export function BackupImportSheet({
   };
 
   const reviewReplace = () => {
-    void Haptics.notificationAsync(
-      Haptics.NotificationFeedbackType.Warning,
-    ).catch(() => undefined);
+    feedback.warning();
     setConfirmingReplace(true);
   };
 

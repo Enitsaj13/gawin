@@ -11,6 +11,8 @@ import {
 import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { usePreferences } from '@/features/preferences/preferences-context';
+
 const FLOATING_BUTTON_SIZE = 56;
 const FLOATING_BUTTON_BOTTOM = 18;
 const TOAST_GAP = 12;
@@ -21,6 +23,7 @@ type ToastAction =
   | 'delete'
   | 'edit'
   | 'move'
+  | 'reminder'
   | 'repeat';
 
 type ToastOptions = {
@@ -87,6 +90,15 @@ function ToastActionIcon({ action }: { action: ToastAction }) {
     );
   }
 
+  if (action === 'reminder') {
+    return (
+      <View style={styles.iconFrame}>
+        <View style={styles.reminderBell} />
+        <View style={styles.reminderBase} />
+      </View>
+    );
+  }
+
   if (action === 'backup') {
     return (
       <View style={styles.iconFrame}>
@@ -109,6 +121,7 @@ function ToastActionIcon({ action }: { action: ToastAction }) {
 
 export function ToastProvider({ children }: PropsWithChildren) {
   const insets = useSafeAreaInsets();
+  const { preferences } = usePreferences();
   const [toastState, setToastState] = useState<ToastState | null>(null);
   const [opacity] = useState(() => new Animated.Value(0));
   const [translateY] = useState(() => new Animated.Value(8));
@@ -142,12 +155,12 @@ export function ToastProvider({ children }: PropsWithChildren) {
 
       Animated.parallel([
         Animated.timing(opacity, {
-          duration: 160,
+          duration: preferences.reducedMotion ? 0 : 160,
           toValue: 1,
           useNativeDriver: true,
         }),
         Animated.timing(translateY, {
-          duration: 160,
+          duration: preferences.reducedMotion ? 0 : 160,
           toValue: 0,
           useNativeDriver: true,
         }),
@@ -156,12 +169,12 @@ export function ToastProvider({ children }: PropsWithChildren) {
       timerRef.current = setTimeout(() => {
         Animated.parallel([
           Animated.timing(opacity, {
-            duration: 150,
+            duration: preferences.reducedMotion ? 0 : 150,
             toValue: 0,
             useNativeDriver: true,
           }),
           Animated.timing(translateY, {
-            duration: 150,
+            duration: preferences.reducedMotion ? 0 : 150,
             toValue: 5,
             useNativeDriver: true,
           }),
@@ -170,7 +183,7 @@ export function ToastProvider({ children }: PropsWithChildren) {
         });
       }, options?.duration ?? (options?.onAction ? 4000 : 2100));
     },
-    [opacity, translateY],
+    [opacity, preferences.reducedMotion, translateY],
   );
 
   const runToastAction = (toast: ToastState) => {
@@ -182,12 +195,12 @@ export function ToastProvider({ children }: PropsWithChildren) {
 
     Animated.parallel([
       Animated.timing(opacity, {
-        duration: 120,
+        duration: preferences.reducedMotion ? 0 : 120,
         toValue: 0,
         useNativeDriver: true,
       }),
       Animated.timing(translateY, {
-        duration: 120,
+        duration: preferences.reducedMotion ? 0 : 120,
         toValue: 4,
         useNativeDriver: true,
       }),
@@ -409,6 +422,29 @@ const styles = StyleSheet.create({
     borderLeftWidth: 1.25,
     borderColor: '#ffffff',
     transform: [{ rotate: '45deg' }],
+  },
+  reminderBell: {
+    position: 'absolute',
+    top: 2,
+    left: 3,
+    width: 8,
+    height: 9,
+    borderTopWidth: 1.25,
+    borderRightWidth: 1.25,
+    borderLeftWidth: 1.25,
+    borderColor: '#ffffff',
+    borderTopLeftRadius: 5,
+    borderTopRightRadius: 5,
+  },
+  reminderBase: {
+    position: 'absolute',
+    right: 2,
+    bottom: 1,
+    left: 2,
+    height: 3,
+    borderTopWidth: 1.25,
+    borderBottomWidth: 1.25,
+    borderColor: '#ffffff',
   },
   backupShaft: {
     position: 'absolute',

@@ -9,6 +9,7 @@ import { useEffect, useState } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { ToastProvider } from '@/components/toast';
+import { PreferencesProvider } from '@/features/preferences/preferences-context';
 import { LoadingScreen } from '@/features/todos/loading-screen';
 import { TodosProvider, useTodos } from '@/features/todos/todos-context';
 
@@ -46,11 +47,13 @@ export default function RootLayout() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <ToastProvider>
-        <TodosProvider>
-          <AppNavigator />
-        </TodosProvider>
-      </ToastProvider>
+      <PreferencesProvider>
+        <ToastProvider>
+          <TodosProvider>
+            <AppNavigator />
+          </TodosProvider>
+        </ToastProvider>
+      </PreferencesProvider>
     </GestureHandlerRootView>
   );
 }
