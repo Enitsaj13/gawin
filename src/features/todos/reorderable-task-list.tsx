@@ -1,4 +1,3 @@
-import * as Haptics from 'expo-haptics';
 import { ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import { Animated, Platform, StyleSheet, View } from 'react-native';
 import {
@@ -7,9 +6,9 @@ import {
   usePanGesture,
 } from 'react-native-gesture-handler';
 
-import { Todo } from './types';
+import { useFeedback } from '@/features/preferences/preferences-context';
 
-const ROW_HEIGHT = 40;
+const DEFAULT_ROW_HEIGHT = 40;
 
 type DragState = {
   fromIndex: number;
@@ -24,14 +23,15 @@ export type TaskReorderControls = {
   suppressPress: boolean;
 };
 
-type ReorderableTaskListProps = {
+type ReorderableTaskListProps<Item extends { id: string }> = {
   onDragStateChange?: (dragging: boolean) => void;
   onReorder: (id: string, toIndex: number) => void;
-  renderItem: (todo: Todo, controls: TaskReorderControls) => ReactNode;
-  todos: Todo[];
+  renderItem: (item: Item, controls: TaskReorderControls) => ReactNode;
+  rowHeight?: number;
+  todos: Item[];
 };
 
-type ReorderableTaskItemProps = {
+type ReorderableTaskItemProps<Item extends { id: string }> = {
   children: (controls: TaskReorderControls) => ReactNode;
   count: number;
   dragState: DragState | null;
@@ -41,19 +41,22 @@ type ReorderableTaskItemProps = {
   onDragEnd: (id: string) => void;
   onDragMove: (id: string, fromIndex: number, distance: number) => void;
   onDragStart: (id: string, fromIndex: number) => void;
-  todo: Todo;
+  rowHeight: number;
+  todo: Item;
 };
 
 function clamp(value: number, minimum: number, maximum: number) {
   return Math.min(Math.max(value, minimum), maximum);
 }
 
-export function ReorderableTaskList({
+export function ReorderableTaskList<Item extends { id: string }>({
   onDragStateChange,
   onReorder,
   renderItem,
+  rowHeight = DEFAULT_ROW_HEIGHT,
   todos,
-}: ReorderableTaskListProps) {
+}: ReorderableTaskListProps<Item>) {
+  const feedback = useFeedback();
   const [dragState, setDragState] = useState<DragState | null>(null);
   const dragStateRef = useRef<DragState | null>(null);
   const isDragging = Boolean(dragState);
@@ -94,7 +97,7 @@ export function ReorderableTaskList({
       if (!current || current.id !== id) return;
 
       const targetIndex = clamp(
-        Math.round(fromIndex + distance / ROW_HEIGHT),
+        Math.round(fromIndex + distance / rowHeight),
         0,
         todos.length - 1,
       );
@@ -102,7 +105,7 @@ export function ReorderableTaskList({
 
       updateDragState({ ...current, targetIndex });
     },
-    [todos.length, updateDragState],
+    [rowHeight, todos.length, updateDragState],
   );
 
   const finishDrag = useCallback(
@@ -117,18 +120,18 @@ export function ReorderableTaskList({
         current.targetIndex !== current.fromIndex
       ) {
         onReorder(id, current.targetIndex);
-        void Haptics.selectionAsync().catch(() => undefined);
+        feedback.selection();
       }
     },
-    [onDragStateChange, onReorder, updateDragState],
+    [feedback, onDragStateChange, onReorder, updateDragState],
   );
 
   const accessibleMove = useCallback(
     (id: string, toIndex: number) => {
       onReorder(id, toIndex);
-      void Haptics.selectionAsync().catch(() => undefined);
+      feedback.selection();
     },
-    [onReorder],
+    [feedback, onReorder],
   );
 
   return (
@@ -144,6 +147,7 @@ export function ReorderableTaskList({
           onDragEnd={(id) => finishDrag(id, true)}
           onDragMove={moveDrag}
           onDragStart={startDrag}
+          rowHeight={rowHeight}
           todo={todo}
         >
           {(controls) => renderItem(todo, controls)}
@@ -153,7 +157,7 @@ export function ReorderableTaskList({
   );
 }
 
-function ReorderableTaskItem({
+function ReorderableTaskItem<Item extends { id: string }>({
   children,
   count,
   dragState,
@@ -163,8 +167,10 @@ function ReorderableTaskItem({
   onDragEnd,
   onDragMove,
   onDragStart,
+  rowHeight,
   todo,
-}: ReorderableTaskItemProps) {
+}: ReorderableTaskItemProps<Item>) {
+  const feedback = useFeedback();
   const [translateY] = useState(() => new Animated.Value(0));
   const [suppressPress, setSuppressPress] = useState(false);
   const isDragging = dragState?.id === todo.id;
@@ -180,15 +186,13 @@ function ReorderableTaskItem({
       translateY.stopAnimation();
       translateY.setValue(0);
       onDragStart(todo.id, index);
-      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(
-        () => undefined,
-      );
+      feedback.impactLight();
     },
     onUpdate: (event) => {
       const distance = clamp(
         event.translationY,
-        -index * ROW_HEIGHT,
-        (count - index - 1) * ROW_HEIGHT,
+        -index * rowHeight,
+        (count - index - 1) * rowHeight,
       );
       translateY.setValue(distance);
       onDragMove(todo.id, index, distance);

@@ -1,32 +1,47 @@
-import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { AppMenuSheet } from '@/components/app-menu-sheet';
+import {
+  useFeedback,
+  usePreferences,
+} from '@/features/preferences/preferences-context';
 import { TaskComposer } from '@/features/todos/task-composer';
 import { ReorderableTaskList } from '@/features/todos/reorderable-task-list';
 import { TaskRow } from '@/features/todos/task-row';
 import { useTodos } from '@/features/todos/todos-context';
 import { Todo } from '@/features/todos/types';
+import { UnfinishedReviewSheet } from '@/features/todos/unfinished-review-sheet';
 import { formatJournalDate, formatWeekday } from '@/lib/date';
 
 type ComposerState = { mode: 'create' } | { mode: 'edit'; todo: Todo } | null;
 
 export default function HomeScreen() {
+  const feedback = useFeedback();
+  const { backupDue } = usePreferences();
   const [composer, setComposer] = useState<ComposerState>(null);
   const [isReordering, setIsReordering] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const {
     addTodo,
+    clearTodoReminder,
     deleteTodo,
+    deleteTodoSeries,
+    duplicateTodo,
     editTodo,
     getTodosForDate,
+    getRepeatDays,
     isTodoRepeating,
+    pendingReviewTodos,
     reorderTodo,
     repeatTodoTomorrow,
-    startDailyRepeat,
-    stopDailyRepeat,
+    reviewUnfinishedTodos,
+    setTodoReminder,
+    startRepeat,
+    stopRepeat,
     today,
     todos,
     toggleTodo,
@@ -63,32 +78,48 @@ export default function HomeScreen() {
                     </Text>
                   ) : null}
                 </View>
-                <Pressable
-                  accessibilityLabel={
-                    pastDateCount
-                      ? `Open past tasks. ${pastDateCount} saved ${pastDateCount === 1 ? 'day' : 'days'}.`
-                      : 'Open backup and restore'
-                  }
-                  accessibilityRole="button"
-                  hitSlop={8}
-                  onPress={() =>
-                    router.navigate(pastDateCount ? '/history' : '/backup')
-                  }
-                  style={({ pressed }) => [
-                    styles.headerAction,
-                    pressed && styles.buttonPressed,
-                  ]}
-                >
-                  <Text style={styles.headerActionText}>
-                    {pastDateCount ? 'Past tasks' : 'Backup'}
-                  </Text>
+                <View style={styles.headerLinks}>
                   {pastDateCount ? (
-                    <Text style={styles.headerActionCount}>
-                      {pastDateCount}
-                    </Text>
+                    <Pressable
+                      accessibilityLabel={`Open past tasks. ${pastDateCount} saved ${pastDateCount === 1 ? 'day' : 'days'}.`}
+                      accessibilityRole="button"
+                      hitSlop={8}
+                      onPress={() => router.navigate('/history')}
+                      style={({ pressed }) => [
+                        styles.headerAction,
+                        pressed && styles.buttonPressed,
+                      ]}
+                    >
+                      <Text style={styles.headerActionText}>Past tasks</Text>
+                      <Text style={styles.headerActionCount}>
+                        {pastDateCount}
+                      </Text>
+                      <Text style={styles.headerActionArrow}>→</Text>
+                    </Pressable>
                   ) : null}
-                  <Text style={styles.headerActionArrow}>→</Text>
-                </Pressable>
+                  <Pressable
+                    accessibilityLabel="Open Gawin menu"
+                    accessibilityRole="button"
+                    hitSlop={8}
+                    onPress={() => setMenuOpen(true)}
+                    style={({ pressed }) => [
+                      styles.menuAction,
+                      pressed && styles.buttonPressed,
+                    ]}
+                  >
+                    <Text style={styles.menuActionText}>Menu →</Text>
+                  </Pressable>
+                </View>
+                {backupDue ? (
+                  <Pressable
+                    accessibilityLabel="A backup is recommended"
+                    accessibilityRole="button"
+                    onPress={() => router.navigate('/backup')}
+                    style={({ pressed }) => pressed && styles.buttonPressed}
+                  >
+                    <Text style={styles.backupDue}>Backup recommended →</Text>
+                  </Pressable>
+                ) : null}
               </View>
             </View>
 
@@ -103,14 +134,21 @@ export default function HomeScreen() {
                     <TaskRow
                       {...reorderControls}
                       isRepeating={isTodoRepeating(todo)}
+                      onClearReminder={clearTodoReminder}
                       onDelete={deleteTodo}
+                      onDeleteSeries={deleteTodoSeries}
+                      onDuplicate={duplicateTodo}
                       onEdit={(selectedTodo) =>
                         setComposer({ mode: 'edit', todo: selectedTodo })
                       }
-                      onRepeatDaily={startDailyRepeat}
+                      onRepeatSchedule={startRepeat}
                       onRepeatTomorrow={repeatTodoTomorrow}
-                      onStopRepeating={stopDailyRepeat}
+                      onSetReminder={(id, reminderAt) => {
+                        void setTodoReminder(id, reminderAt);
+                      }}
+                      onStopRepeat={stopRepeat}
                       onToggle={toggleTodo}
+                      repeatDays={getRepeatDays(todo)}
                       todo={todo}
                     />
                   )}
@@ -129,9 +167,7 @@ export default function HomeScreen() {
             accessibilityRole="button"
             accessibilityHint="Opens the new task form"
             onPress={() => {
-              void Haptics.impactAsync(
-                Haptics.ImpactFeedbackStyle.Light,
-              ).catch(() => undefined);
+              feedback.impactLight();
               setComposer({ mode: 'create' });
             }}
             style={({ pressed }) => [
@@ -149,14 +185,17 @@ export default function HomeScreen() {
 
       {composer ? (
         <TaskComposer
+          allowSeriesUpdate={
+            composer.mode === 'edit' && isTodoRepeating(composer.todo)
+          }
           date={today}
           heading={composer.mode === 'edit' ? 'Edit task' : 'New task'}
           initialTitle={composer.mode === 'edit' ? composer.todo.title : ''}
           key={composer.mode === 'edit' ? composer.todo.id : 'new-task'}
           onClose={() => setComposer(null)}
-          onSubmit={(title) => {
+          onSubmit={(title, updateSeries) => {
             if (composer.mode === 'edit') {
-              editTodo(composer.todo.id, title);
+              editTodo(composer.todo.id, title, updateSeries);
               return;
             }
 
@@ -166,6 +205,17 @@ export default function HomeScreen() {
           visible
         />
       ) : null}
+
+      {pendingReviewTodos.length && !composer ? (
+        <UnfinishedReviewSheet
+          onDelete={(ids) => reviewUnfinishedTodos('delete', ids)}
+          onKeep={() => reviewUnfinishedTodos('keep')}
+          onMove={(ids) => reviewUnfinishedTodos('move', ids)}
+          todos={pendingReviewTodos}
+        />
+      ) : null}
+
+      {menuOpen ? <AppMenuSheet onClose={() => setMenuOpen(false)} /> : null}
     </SafeAreaView>
   );
 }
@@ -244,6 +294,22 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderColor: '#2f2f2d',
   },
+  headerLinks: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 9,
+  },
+  menuAction: {
+    minHeight: 28,
+    justifyContent: 'center',
+    borderBottomWidth: 1,
+    borderColor: '#2f2f2d',
+  },
+  menuActionText: {
+    color: '#343432',
+    fontFamily: 'SpaceMono_700Bold',
+    fontSize: 9,
+  },
   headerActionText: {
     color: '#343432',
     fontFamily: 'SpaceMono_700Bold',
@@ -260,6 +326,12 @@ const styles = StyleSheet.create({
     color: '#343432',
     fontFamily: 'SpaceMono_400Regular',
     fontSize: 13,
+  },
+  backupDue: {
+    color: '#777671',
+    fontFamily: 'SpaceMono_400Regular',
+    fontSize: 8,
+    textDecorationLine: 'underline',
   },
   todayTasks: {
     marginTop: 25,

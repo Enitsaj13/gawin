@@ -1,4 +1,3 @@
-import * as Haptics from 'expo-haptics';
 import { useEffect, useRef, useState } from 'react';
 import {
   Animated,
@@ -11,35 +10,68 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-type SheetMode = 'actions' | 'delete' | 'repeat';
+import {
+  useFeedback,
+  usePreferences,
+} from '@/features/preferences/preferences-context';
+
+type SheetMode =
+  | 'actions'
+  | 'delete'
+  | 'reminder'
+  | 'repeat'
+  | 'repeat-custom';
 
 type TaskActionsSheetProps = {
   initialMode?: SheetMode;
+  isDailyDefault?: boolean;
+  defaultEnabled?: boolean;
   isRepeating?: boolean;
+  reminderAt?: string;
+  repeatDays?: number[] | null;
   taskTitle: string;
+  onClearReminder?: () => void;
   onClose: () => void;
   onDelete?: () => void;
+  onDeleteSeries?: () => void;
+  onDuplicate?: () => void;
   onEdit?: () => void;
   onMoveToToday?: () => void;
-  onRepeatDaily?: () => void;
+  onRepeatSchedule?: (daysOfWeek: number[]) => void;
   onRepeatTomorrow?: () => void;
-  onStopRepeating?: () => void;
+  onSetReminder?: (reminderAt: string) => void;
+  onStopRepeat?: () => void;
+  onToggleDefault?: () => void;
 };
 
 export function TaskActionsSheet({
   initialMode = 'actions',
+  isDailyDefault = false,
+  defaultEnabled = true,
   isRepeating = false,
+  reminderAt,
+  repeatDays,
   taskTitle,
+  onClearReminder,
   onClose,
   onDelete,
+  onDeleteSeries,
+  onDuplicate,
   onEdit,
   onMoveToToday,
-  onRepeatDaily,
+  onRepeatSchedule,
   onRepeatTomorrow,
-  onStopRepeating,
+  onSetReminder,
+  onStopRepeat,
+  onToggleDefault,
 }: TaskActionsSheetProps) {
   const insets = useSafeAreaInsets();
+  const feedback = useFeedback();
+  const { preferences } = usePreferences();
   const [mode, setMode] = useState<SheetMode>(initialMode);
+  const [customDays, setCustomDays] = useState(
+    () => new Set(repeatDays ?? [1, 2, 3, 4, 5]),
+  );
   const [backdropOpacity] = useState(() => new Animated.Value(0));
   const [translateY] = useState(() => new Animated.Value(36));
   const closingRef = useRef(false);
@@ -47,19 +79,19 @@ export function TaskActionsSheet({
   useEffect(() => {
     Animated.parallel([
       Animated.timing(backdropOpacity, {
-        duration: 180,
+        duration: preferences.reducedMotion ? 0 : 180,
         easing: Easing.out(Easing.quad),
         toValue: 1,
         useNativeDriver: true,
       }),
       Animated.timing(translateY, {
-        duration: 220,
+        duration: preferences.reducedMotion ? 0 : 220,
         easing: Easing.out(Easing.cubic),
         toValue: 0,
         useNativeDriver: true,
       }),
     ]).start();
-  }, [backdropOpacity, translateY]);
+  }, [backdropOpacity, preferences.reducedMotion, translateY]);
 
   const dismiss = (afterClose?: () => void) => {
     if (closingRef.current) return;
@@ -67,13 +99,13 @@ export function TaskActionsSheet({
 
     Animated.parallel([
       Animated.timing(backdropOpacity, {
-        duration: 150,
+        duration: preferences.reducedMotion ? 0 : 150,
         easing: Easing.in(Easing.quad),
         toValue: 0,
         useNativeDriver: true,
       }),
       Animated.timing(translateY, {
-        duration: 170,
+        duration: preferences.reducedMotion ? 0 : 170,
         easing: Easing.in(Easing.cubic),
         toValue: 36,
         useNativeDriver: true,
@@ -85,23 +117,35 @@ export function TaskActionsSheet({
   };
 
   const showDeleteConfirmation = () => {
-    void Haptics.notificationAsync(
-      Haptics.NotificationFeedbackType.Warning,
-    ).catch(() => undefined);
+    feedback.warning();
     setMode('delete');
   };
 
   const showRepeatOptions = () => {
-    void Haptics.selectionAsync().catch(() => undefined);
+    feedback.selection();
     setMode('repeat');
+  };
+
+  const showReminderOptions = () => {
+    feedback.selection();
+    setMode('reminder');
   };
 
   const editTask = () => dismiss(onEdit);
   const deleteTask = () => dismiss(onDelete);
+  const deleteSeries = () => dismiss(onDeleteSeries);
+  const duplicateTask = () => dismiss(onDuplicate);
   const moveToToday = () => dismiss(onMoveToToday);
-  const repeatDaily = () => dismiss(onRepeatDaily);
   const repeatTomorrow = () => dismiss(onRepeatTomorrow);
-  const stopRepeating = () => dismiss(onStopRepeating);
+  const stopRepeating = () => dismiss(onStopRepeat);
+  const toggleDefault = () => dismiss(onToggleDefault);
+  const setRepeatSchedule = (days: number[]) =>
+    dismiss(() => onRepeatSchedule?.(days));
+  const setReminder = (date: Date) => {
+    onSetReminder?.(date.toISOString());
+    dismiss();
+  };
+  const clearReminder = () => dismiss(onClearReminder);
   const cancelDelete = () => {
     if (initialMode === 'delete') {
       dismiss();
@@ -144,7 +188,9 @@ export function TaskActionsSheet({
           <View style={styles.sheetContent}>
             {mode === 'actions' ? (
               <>
-                <Text style={styles.eyebrow}>Task actions</Text>
+                <Text style={styles.eyebrow}>
+                  {isDailyDefault ? 'Daily default' : 'Task actions'}
+                </Text>
                 <Text numberOfLines={2} style={styles.taskTitle}>
                   {taskTitle}
                 </Text>
@@ -152,7 +198,7 @@ export function TaskActionsSheet({
                 <View style={styles.actionList}>
                   {onEdit ? (
                     <Pressable
-                      accessibilityLabel={`Edit task: ${taskTitle}`}
+                      accessibilityLabel={`Edit ${isDailyDefault ? 'daily default' : 'task'}: ${taskTitle}`}
                       accessibilityRole="button"
                       onPress={editTask}
                       style={({ pressed }) => [
@@ -161,7 +207,41 @@ export function TaskActionsSheet({
                       ]}
                     >
                       <PencilIcon />
-                      <Text style={styles.actionText}>Edit task</Text>
+                      <Text style={styles.actionText}>
+                        {isDailyDefault ? 'Edit daily default' : 'Edit task'}
+                      </Text>
+                    </Pressable>
+                  ) : null}
+
+                  {onDuplicate ? (
+                    <Pressable
+                      accessibilityLabel={`Duplicate task: ${taskTitle}`}
+                      accessibilityRole="button"
+                      onPress={duplicateTask}
+                      style={({ pressed }) => [
+                        styles.actionRow,
+                        pressed && styles.pressed,
+                      ]}
+                    >
+                      <DuplicateIcon />
+                      <Text style={styles.actionText}>Duplicate task</Text>
+                    </Pressable>
+                  ) : null}
+
+                  {onToggleDefault ? (
+                    <Pressable
+                      accessibilityLabel={`${defaultEnabled ? 'Pause' : 'Enable'} daily default: ${taskTitle}`}
+                      accessibilityRole="button"
+                      onPress={toggleDefault}
+                      style={({ pressed }) => [
+                        styles.actionRow,
+                        pressed && styles.pressed,
+                      ]}
+                    >
+                      <RepeatIcon />
+                      <Text style={styles.actionText}>
+                        {defaultEnabled ? 'Pause daily default' : 'Enable daily default'}
+                      </Text>
                     </Pressable>
                   ) : null}
 
@@ -180,7 +260,24 @@ export function TaskActionsSheet({
                     </Pressable>
                   ) : null}
 
-                  {onRepeatDaily || onRepeatTomorrow || onStopRepeating ? (
+                  {onSetReminder || onClearReminder ? (
+                    <Pressable
+                      accessibilityLabel={`Reminder options for: ${taskTitle}`}
+                      accessibilityRole="button"
+                      onPress={showReminderOptions}
+                      style={({ pressed }) => [
+                        styles.actionRow,
+                        pressed && styles.pressed,
+                      ]}
+                    >
+                      <ReminderIcon />
+                      <Text style={styles.actionText}>
+                        {reminderAt ? 'Change reminder' : 'Add reminder'}
+                      </Text>
+                    </Pressable>
+                  ) : null}
+
+                  {onRepeatSchedule || onRepeatTomorrow || onStopRepeat ? (
                     <Pressable
                       accessibilityLabel={`Repeat options for: ${taskTitle}`}
                       accessibilityRole="button"
@@ -192,14 +289,16 @@ export function TaskActionsSheet({
                     >
                       <RepeatIcon />
                       <Text style={styles.actionText}>
-                        {isRepeating ? 'Repeats daily' : 'Repeat task'}
+                        {isRepeating
+                          ? repeatScheduleLabel(repeatDays)
+                          : 'Repeat task'}
                       </Text>
                     </Pressable>
                   ) : null}
 
                   {onDelete ? (
                     <Pressable
-                      accessibilityLabel={`Delete task: ${taskTitle}`}
+                      accessibilityLabel={`${isDailyDefault ? 'Remove daily default' : 'Delete task'}: ${taskTitle}`}
                       accessibilityRole="button"
                       onPress={showDeleteConfirmation}
                       style={({ pressed }) => [
@@ -208,7 +307,9 @@ export function TaskActionsSheet({
                       ]}
                     >
                       <TrashIcon />
-                      <Text style={styles.actionText}>Delete task</Text>
+                      <Text style={styles.actionText}>
+                        {isDailyDefault ? 'Remove daily default' : 'Delete task'}
+                      </Text>
                     </Pressable>
                   ) : null}
                 </View>
@@ -233,7 +334,41 @@ export function TaskActionsSheet({
                 </Text>
 
                 <View style={styles.actionList}>
-                  {isRepeating ? (
+                  {onRepeatTomorrow && !isRepeating ? (
+                    <Pressable
+                      accessibilityLabel={`Repeat task tomorrow: ${taskTitle}`}
+                      accessibilityRole="button"
+                      onPress={repeatTomorrow}
+                      style={({ pressed }) => [
+                        styles.actionRow,
+                        pressed && styles.pressed,
+                      ]}
+                    >
+                      <MoveIcon />
+                      <Text style={styles.actionText}>Repeat tomorrow</Text>
+                    </Pressable>
+                  ) : null}
+                  {onRepeatSchedule ? (
+                    <>
+                      <ScheduleRow
+                        label="Every day"
+                        onPress={() => setRepeatSchedule([0, 1, 2, 3, 4, 5, 6])}
+                      />
+                      <ScheduleRow
+                        label="Weekdays"
+                        onPress={() => setRepeatSchedule([1, 2, 3, 4, 5])}
+                      />
+                      <ScheduleRow
+                        label="Weekends"
+                        onPress={() => setRepeatSchedule([0, 6])}
+                      />
+                      <ScheduleRow
+                        label="Choose days"
+                        onPress={() => setMode('repeat-custom')}
+                      />
+                    </>
+                  ) : null}
+                  {isRepeating && onStopRepeat ? (
                     <Pressable
                       accessibilityLabel={`Stop repeating task: ${taskTitle}`}
                       accessibilityRole="button"
@@ -244,40 +379,9 @@ export function TaskActionsSheet({
                       ]}
                     >
                       <RepeatIcon />
-                      <Text style={styles.actionText}>Stop daily repeat</Text>
+                      <Text style={styles.actionText}>Stop repeat</Text>
                     </Pressable>
-                  ) : (
-                    <>
-                      {onRepeatTomorrow ? (
-                        <Pressable
-                          accessibilityLabel={`Repeat task tomorrow: ${taskTitle}`}
-                          accessibilityRole="button"
-                          onPress={repeatTomorrow}
-                          style={({ pressed }) => [
-                            styles.actionRow,
-                            pressed && styles.pressed,
-                          ]}
-                        >
-                          <MoveIcon />
-                          <Text style={styles.actionText}>Repeat tomorrow</Text>
-                        </Pressable>
-                      ) : null}
-                      {onRepeatDaily ? (
-                        <Pressable
-                          accessibilityLabel={`Repeat task daily: ${taskTitle}`}
-                          accessibilityRole="button"
-                          onPress={repeatDaily}
-                          style={({ pressed }) => [
-                            styles.actionRow,
-                            pressed && styles.pressed,
-                          ]}
-                        >
-                          <RepeatIcon />
-                          <Text style={styles.actionText}>Repeat daily</Text>
-                        </Pressable>
-                      ) : null}
-                    </>
-                  )}
+                  ) : null}
                 </View>
 
                 <Pressable
@@ -292,42 +396,211 @@ export function TaskActionsSheet({
                   <Text style={styles.cancelText}>Back</Text>
                 </Pressable>
               </>
-            ) : (
+            ) : mode === 'repeat-custom' ? (
               <>
-                <Text style={styles.eyebrow}>Delete task</Text>
-                <Text style={styles.confirmTitle}>Delete this task?</Text>
-                <Text numberOfLines={2} style={styles.confirmTaskTitle}>
-                  {taskTitle}
-                </Text>
-                <Text style={styles.confirmBody}>
-                  You can undo this for a few seconds.
-                </Text>
-
+                <Text style={styles.eyebrow}>Repeat task</Text>
+                <Text style={styles.confirmTitle}>Choose days</Text>
+                <View style={styles.dayPicker}>
+                  {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((label, day) => {
+                    const selected = customDays.has(day);
+                    return (
+                      <Pressable
+                        accessibilityLabel={`${selected ? 'Remove' : 'Add'} ${dayName(day)}`}
+                        accessibilityRole="checkbox"
+                        accessibilityState={{ checked: selected }}
+                        key={`${label}-${day}`}
+                        onPress={() => {
+                          feedback.selection();
+                          setCustomDays((current) => {
+                            const next = new Set(current);
+                            if (next.has(day)) next.delete(day);
+                            else next.add(day);
+                            return next;
+                          });
+                        }}
+                        style={({ pressed }) => [
+                          styles.dayButton,
+                          selected && styles.dayButtonSelected,
+                          pressed && styles.pressed,
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.dayButtonText,
+                            selected && styles.dayButtonTextSelected,
+                          ]}
+                        >
+                          {label}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
                 <View style={styles.confirmActions}>
                   <Pressable
-                    accessibilityLabel="Cancel delete"
                     accessibilityRole="button"
-                    onPress={cancelDelete}
+                    onPress={() => setMode('repeat')}
                     style={({ pressed }) => [
                       styles.confirmCancel,
                       pressed && styles.pressed,
                     ]}
                   >
-                    <Text style={styles.confirmCancelText}>Cancel</Text>
+                    <Text style={styles.confirmCancelText}>Back</Text>
                   </Pressable>
                   <Pressable
-                    accessibilityLabel={`Confirm delete task: ${taskTitle}`}
                     accessibilityRole="button"
-                    onPress={deleteTask}
+                    disabled={!customDays.size}
+                    onPress={() =>
+                      setRepeatSchedule([...customDays].sort())
+                    }
                     style={({ pressed }) => [
                       styles.confirmDelete,
+                      !customDays.size && styles.disabled,
                       pressed && styles.pressed,
                     ]}
                   >
-                    <TrashIcon color="#ffffff" />
-                    <Text style={styles.confirmDeleteText}>Delete</Text>
+                    <Text style={styles.confirmDeleteText}>Save schedule</Text>
                   </Pressable>
                 </View>
+              </>
+            ) : mode === 'reminder' ? (
+              <>
+                <Text style={styles.eyebrow}>Task reminder</Text>
+                <Text numberOfLines={2} style={styles.taskTitle}>
+                  {taskTitle}
+                </Text>
+                <View style={styles.actionList}>
+                  {getReminderPresets().map((preset) => (
+                    <Pressable
+                      accessibilityLabel={`${preset.label}: ${taskTitle}`}
+                      accessibilityRole="button"
+                      key={preset.label}
+                      onPress={() => setReminder(preset.date)}
+                      style={({ pressed }) => [
+                        styles.actionRow,
+                        pressed && styles.pressed,
+                      ]}
+                    >
+                      <ReminderIcon />
+                      <View>
+                        <Text style={styles.actionText}>{preset.label}</Text>
+                        <Text style={styles.actionMeta}>{preset.detail}</Text>
+                      </View>
+                    </Pressable>
+                  ))}
+                  {reminderAt && onClearReminder ? (
+                    <Pressable
+                      accessibilityLabel={`Remove reminder for: ${taskTitle}`}
+                      accessibilityRole="button"
+                      onPress={clearReminder}
+                      style={({ pressed }) => [
+                        styles.actionRow,
+                        pressed && styles.pressed,
+                      ]}
+                    >
+                      <ReminderIcon />
+                      <Text style={styles.actionText}>Remove reminder</Text>
+                    </Pressable>
+                  ) : null}
+                </View>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => setMode('actions')}
+                  style={({ pressed }) => [
+                    styles.cancelRow,
+                    pressed && styles.pressed,
+                  ]}
+                >
+                  <Text style={styles.cancelText}>Back</Text>
+                </Pressable>
+              </>
+            ) : (
+              <>
+                <Text style={styles.eyebrow}>
+                  {isDailyDefault ? 'Daily default' : 'Delete task'}
+                </Text>
+                <Text style={styles.confirmTitle}>
+                  {isDailyDefault ? 'Remove this default?' : 'Delete this task?'}
+                </Text>
+                <Text numberOfLines={2} style={styles.confirmTaskTitle}>
+                  {taskTitle}
+                </Text>
+                <Text style={styles.confirmBody}>
+                  {onDeleteSeries
+                    ? 'Choose whether to remove only today’s copy or the daily default too.'
+                    : isDailyDefault
+                      ? 'Existing tasks stay in history. It will not appear on future days.'
+                      : 'You can undo this for a few seconds.'}
+                </Text>
+
+                {onDeleteSeries ? (
+                  <>
+                    <View style={styles.confirmActions}>
+                      <Pressable
+                        accessibilityLabel={`Delete only today’s task: ${taskTitle}`}
+                        accessibilityRole="button"
+                        onPress={deleteTask}
+                        style={({ pressed }) => [
+                          styles.confirmCancel,
+                          pressed && styles.pressed,
+                        ]}
+                      >
+                        <Text style={styles.confirmCancelText}>Today only</Text>
+                      </Pressable>
+                      <Pressable
+                        accessibilityLabel={`Delete today and future repeats: ${taskTitle}`}
+                        accessibilityRole="button"
+                        onPress={deleteSeries}
+                        style={({ pressed }) => [
+                          styles.confirmDelete,
+                          pressed && styles.pressed,
+                        ]}
+                      >
+                        <TrashIcon color="#ffffff" />
+                        <Text style={styles.confirmDeleteText}>
+                          Today & future
+                        </Text>
+                      </Pressable>
+                    </View>
+                    <Pressable
+                      accessibilityLabel="Cancel delete"
+                      accessibilityRole="button"
+                      onPress={cancelDelete}
+                      style={({ pressed }) => [
+                        styles.cancelRow,
+                        pressed && styles.pressed,
+                      ]}
+                    >
+                      <Text style={styles.cancelText}>Cancel</Text>
+                    </Pressable>
+                  </>
+                ) : (
+                  <View style={styles.confirmActions}>
+                    <Pressable
+                      accessibilityLabel="Cancel delete"
+                      accessibilityRole="button"
+                      onPress={cancelDelete}
+                      style={({ pressed }) => [
+                        styles.confirmCancel,
+                        pressed && styles.pressed,
+                      ]}
+                    >
+                      <Text style={styles.confirmCancelText}>Cancel</Text>
+                    </Pressable>
+                    <Pressable
+                      accessibilityLabel={`Confirm ${isDailyDefault ? 'remove daily default' : 'delete task'}: ${taskTitle}`}
+                      accessibilityRole="button"
+                      onPress={deleteTask}
+                      style={({ pressed }) => [
+                        styles.confirmDelete,
+                        pressed && styles.pressed,
+                      ]}
+                    >
+                      <TrashIcon color="#ffffff" />
+                      <Text style={styles.confirmDeleteText}>Delete</Text>
+                    </Pressable>
+                  </View>
+                )}
               </>
             )}
           </View>
@@ -335,6 +608,60 @@ export function TaskActionsSheet({
       </View>
     </Modal>
   );
+}
+
+function ScheduleRow({ label, onPress }: { label: string; onPress: () => void }) {
+  return (
+    <Pressable
+      accessibilityLabel={`Repeat ${label.toLowerCase()}`}
+      accessibilityRole="button"
+      onPress={onPress}
+      style={({ pressed }) => [styles.actionRow, pressed && styles.pressed]}
+    >
+      <RepeatIcon />
+      <Text style={styles.actionText}>{label}</Text>
+    </Pressable>
+  );
+}
+
+function getReminderPresets() {
+  const now = new Date();
+  const inOneHour = new Date(now.getTime() + 60 * 60 * 1000);
+  const evening = new Date(now);
+  evening.setHours(18, 0, 0, 0);
+  if (evening <= now) evening.setDate(evening.getDate() + 1);
+  const tomorrow = new Date(now);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  tomorrow.setHours(9, 0, 0, 0);
+
+  const detail = (date: Date) =>
+    `${date.toLocaleDateString('en-US', {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+    })} · ${date.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+    })}`;
+
+  return [
+    { label: 'In one hour', date: inOneHour, detail: detail(inOneHour) },
+    { label: 'This evening', date: evening, detail: detail(evening) },
+    { label: 'Tomorrow morning', date: tomorrow, detail: detail(tomorrow) },
+  ];
+}
+
+function repeatScheduleLabel(days?: number[] | null) {
+  const schedule = days ?? [0, 1, 2, 3, 4, 5, 6];
+  const value = [...schedule].sort().join(',');
+  if (value === '0,1,2,3,4,5,6') return 'Repeats daily';
+  if (value === '1,2,3,4,5') return 'Repeats on weekdays';
+  if (value === '0,6') return 'Repeats on weekends';
+  return 'Custom repeat';
+}
+
+function dayName(day: number) {
+  return ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][day];
 }
 
 function PencilIcon({ color = '#242422' }: { color?: string }) {
@@ -346,6 +673,32 @@ function PencilIcon({ color = '#242422' }: { color?: string }) {
     >
       <View style={[styles.pencilBody, { borderColor: color }]} />
       <View style={[styles.pencilTip, { borderColor: color }]} />
+    </View>
+  );
+}
+
+function DuplicateIcon({ color = '#242422' }: { color?: string }) {
+  return (
+    <View
+      accessibilityElementsHidden
+      importantForAccessibility="no"
+      style={styles.icon}
+    >
+      <View style={[styles.duplicateBack, { borderColor: color }]} />
+      <View style={[styles.duplicateFront, { borderColor: color }]} />
+    </View>
+  );
+}
+
+function ReminderIcon({ color = '#242422' }: { color?: string }) {
+  return (
+    <View
+      accessibilityElementsHidden
+      importantForAccessibility="no"
+      style={styles.icon}
+    >
+      <View style={[styles.reminderDome, { borderColor: color }]} />
+      <View style={[styles.reminderLine, { backgroundColor: color }]} />
     </View>
   );
 }
@@ -454,6 +807,12 @@ const styles = StyleSheet.create({
     fontFamily: 'SpaceMono_700Bold',
     fontSize: 12,
   },
+  actionMeta: {
+    marginTop: 1,
+    color: '#8b8a85',
+    fontFamily: 'SpaceMono_400Regular',
+    fontSize: 8,
+  },
   cancelRow: {
     minHeight: 50,
     alignItems: 'center',
@@ -492,6 +851,33 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 10,
   },
+  dayPicker: {
+    marginTop: 25,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 5,
+  },
+  dayButton: {
+    maxWidth: 38,
+    height: 38,
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#8a8984',
+  },
+  dayButtonSelected: {
+    borderColor: '#111111',
+    backgroundColor: '#111111',
+  },
+  dayButtonText: {
+    color: '#444441',
+    fontFamily: 'SpaceMono_700Bold',
+    fontSize: 10,
+  },
+  dayButtonTextSelected: {
+    color: '#ffffff',
+  },
   confirmCancel: {
     minHeight: 50,
     flex: 1,
@@ -522,6 +908,9 @@ const styles = StyleSheet.create({
   pressed: {
     opacity: 0.52,
   },
+  disabled: {
+    opacity: 0.34,
+  },
   icon: {
     width: 14,
     height: 14,
@@ -543,6 +932,42 @@ const styles = StyleSheet.create({
     height: 4,
     borderRightWidth: 1.2,
     borderBottomWidth: 1.2,
+  },
+  duplicateBack: {
+    position: 'absolute',
+    top: 1,
+    left: 1,
+    width: 9,
+    height: 9,
+    borderWidth: 1.2,
+  },
+  duplicateFront: {
+    position: 'absolute',
+    right: 1,
+    bottom: 1,
+    width: 9,
+    height: 9,
+    borderWidth: 1.2,
+    backgroundColor: '#fbfbf9',
+  },
+  reminderDome: {
+    position: 'absolute',
+    top: 1,
+    left: 3,
+    width: 8,
+    height: 9,
+    borderTopWidth: 1.2,
+    borderRightWidth: 1.2,
+    borderLeftWidth: 1.2,
+    borderTopLeftRadius: 5,
+    borderTopRightRadius: 5,
+  },
+  reminderLine: {
+    position: 'absolute',
+    right: 2,
+    bottom: 2,
+    left: 2,
+    height: 1.2,
   },
   trashHandle: {
     position: 'absolute',

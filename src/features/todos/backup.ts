@@ -148,6 +148,18 @@ function validateTask(value: unknown, index: number): Todo {
     );
   }
 
+  if (value.reminderAt !== undefined) {
+    if (
+      typeof value.reminderAt !== 'string' ||
+      Number.isNaN(Date.parse(value.reminderAt))
+    ) {
+      throw new BackupValidationError(
+        `Task ${index + 1} has an invalid reminder.`,
+      );
+    }
+    task.reminderAt = new Date(value.reminderAt).toISOString();
+  }
+
   return task;
 }
 
@@ -156,7 +168,7 @@ function validateRepeatRule(value: unknown, index: number): RepeatRule {
     throw new BackupValidationError(`Repeat rule ${index + 1} is invalid.`);
   }
 
-  return {
+  const rule: RepeatRule = {
     id: validateId(value.id, `Repeat rule ${index + 1}`),
     title: validateTitle(value.title, `Repeat rule ${index + 1}`),
     lastCreatedDate: validateDate(
@@ -165,6 +177,23 @@ function validateRepeatRule(value: unknown, index: number): RepeatRule {
     ),
     active: validateBoolean(value.active, `Repeat rule ${index + 1}`),
   };
+
+  if (value.daysOfWeek !== undefined) {
+    if (
+      !Array.isArray(value.daysOfWeek) ||
+      !value.daysOfWeek.length ||
+      value.daysOfWeek.some(
+        (day) => !Number.isInteger(day) || day < 0 || day > 6,
+      )
+    ) {
+      throw new BackupValidationError(
+        `Repeat rule ${index + 1} has an invalid schedule.`,
+      );
+    }
+    rule.daysOfWeek = [...new Set(value.daysOfWeek as number[])].sort();
+  }
+
+  return rule;
 }
 
 function validateId(value: unknown, label: string) {

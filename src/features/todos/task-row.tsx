@@ -1,4 +1,3 @@
-import * as Haptics from 'expo-haptics';
 import { useState } from 'react';
 import {
   Animated,
@@ -7,6 +6,11 @@ import {
   Text,
   View,
 } from 'react-native';
+
+import {
+  useFeedback,
+  usePreferences,
+} from '@/features/preferences/preferences-context';
 
 import {
   ReorderGestureDetector,
@@ -22,11 +26,16 @@ type TaskRowProps = Partial<TaskReorderControls> & {
   isRepeating?: boolean;
   todo: Todo;
   onDelete?: (id: string) => void;
+  onDeleteSeries?: (id: string) => void;
+  onDuplicate?: (id: string) => void;
   onEdit?: (todo: Todo) => void;
+  onClearReminder?: (id: string) => void;
   onMoveToToday?: (id: string) => void;
-  onRepeatDaily?: (id: string) => void;
+  onRepeatSchedule?: (id: string, daysOfWeek: number[]) => void;
   onRepeatTomorrow?: (id: string) => void;
-  onStopRepeating?: (id: string) => void;
+  onSetReminder?: (id: string, reminderAt: string) => void;
+  onStopRepeat?: (id: string) => void;
+  repeatDays?: number[] | null;
   onToggle: (id: string) => void;
 };
 
@@ -38,14 +47,21 @@ export function TaskRow({
   reorderGesture,
   suppressPress,
   todo,
+  onClearReminder,
   onDelete,
+  onDeleteSeries,
+  onDuplicate,
   onEdit,
   onMoveToToday,
-  onRepeatDaily,
+  onRepeatSchedule,
   onRepeatTomorrow,
-  onStopRepeating,
+  onSetReminder,
+  onStopRepeat,
+  repeatDays,
   onToggle,
 }: TaskRowProps) {
+  const feedback = useFeedback();
+  const { preferences } = usePreferences();
   const [actionSheetMode, setActionSheetMode] =
     useState<ActionSheetMode>(null);
   const [checkboxScale] = useState(() => new Animated.Value(1));
@@ -56,15 +72,18 @@ export function TaskRow({
   const openActions = () => {
     if (
       !onDelete &&
+      !onDuplicate &&
       !onEdit &&
+      !onClearReminder &&
       !onMoveToToday &&
-      !onRepeatDaily &&
+      !onRepeatSchedule &&
       !onRepeatTomorrow &&
-      !onStopRepeating
+      !onSetReminder &&
+      !onStopRepeat
     ) {
       return;
     }
-    void Haptics.selectionAsync().catch(() => undefined);
+    feedback.selection();
     setActionSheetMode('actions');
   };
 
@@ -84,6 +103,15 @@ export function TaskRow({
 
     checkboxScale.stopAnimation();
     labelOpacity.stopAnimation();
+
+    if (preferences.reducedMotion) {
+      checkboxScale.setValue(1);
+      labelOpacity.setValue(willComplete ? 0.52 : 1);
+      feedback.selection();
+      onToggle(todo.id);
+      return;
+    }
+
     checkboxScale.setValue(willComplete ? 0.84 : 0.9);
 
     Animated.parallel([
@@ -100,7 +128,7 @@ export function TaskRow({
       }),
     ]).start();
 
-    void Haptics.selectionAsync().catch(() => undefined);
+    feedback.selection();
     onToggle(todo.id);
   };
 
@@ -137,17 +165,24 @@ export function TaskRow({
         pressed && styles.pressed,
       ]}
     >
-      <Animated.Text
-        numberOfLines={1}
-        style={[
-          styles.label,
-          compact && styles.compactLabel,
-          todo.completed && styles.completedLabel,
-          { opacity: labelOpacity },
-        ]}
-      >
-        {todo.title}
-      </Animated.Text>
+      <View>
+        <Animated.Text
+          numberOfLines={1}
+          style={[
+            styles.label,
+            compact && styles.compactLabel,
+            todo.completed && styles.completedLabel,
+            { opacity: labelOpacity },
+          ]}
+        >
+          {todo.title}
+        </Animated.Text>
+        {!compact && todo.reminderAt ? (
+          <Text style={styles.reminderLabel}>
+            Remind {formatReminder(todo.reminderAt)}
+          </Text>
+        ) : null}
+      </View>
     </Pressable>
   );
 
@@ -195,10 +230,13 @@ export function TaskRow({
         {!compact &&
         (onEdit ||
           onDelete ||
+          onDuplicate ||
+          onClearReminder ||
           onMoveToToday ||
-          onRepeatDaily ||
+          onRepeatSchedule ||
           onRepeatTomorrow ||
-          onStopRepeating) ? (
+          onSetReminder ||
+          onStopRepeat) ? (
           <Pressable
             accessibilityLabel={`Actions for ${todo.title}`}
             accessibilityRole="button"
@@ -218,26 +256,57 @@ export function TaskRow({
         <TaskActionsSheet
           initialMode={actionSheetMode}
           isRepeating={isRepeating}
+          reminderAt={todo.reminderAt}
+          repeatDays={repeatDays}
           onClose={() => setActionSheetMode(null)}
+          onClearReminder={
+            onClearReminder ? () => onClearReminder(todo.id) : undefined
+          }
           onDelete={onDelete ? () => onDelete(todo.id) : undefined}
+          onDeleteSeries={
+            onDeleteSeries && isRepeating
+              ? () => onDeleteSeries(todo.id)
+              : undefined
+          }
+          onDuplicate={onDuplicate ? () => onDuplicate(todo.id) : undefined}
           onEdit={onEdit ? () => onEdit(todo) : undefined}
           onMoveToToday={
             onMoveToToday ? () => onMoveToToday(todo.id) : undefined
           }
-          onRepeatDaily={
-            onRepeatDaily ? () => onRepeatDaily(todo.id) : undefined
+          onRepeatSchedule={
+            onRepeatSchedule
+              ? (daysOfWeek) => onRepeatSchedule(todo.id, daysOfWeek)
+              : undefined
           }
           onRepeatTomorrow={
             onRepeatTomorrow ? () => onRepeatTomorrow(todo.id) : undefined
           }
-          onStopRepeating={
-            onStopRepeating ? () => onStopRepeating(todo.id) : undefined
+          onSetReminder={
+            onSetReminder
+              ? (reminderAt) => onSetReminder(todo.id, reminderAt)
+              : undefined
+          }
+          onStopRepeat={
+            onStopRepeat ? () => onStopRepeat(todo.id) : undefined
           }
           taskTitle={todo.title}
         />
       ) : null}
     </>
   );
+}
+
+function formatReminder(value: string) {
+  const date = new Date(value);
+  const today = new Date();
+  const sameDay = date.toDateString() === today.toDateString();
+  const time = date.toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+  return sameDay
+    ? `today, ${time}`
+    : `${date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}, ${time}`;
 }
 
 const styles = StyleSheet.create({
@@ -301,6 +370,12 @@ const styles = StyleSheet.create({
   completedLabel: {
     color: '#777671',
     textDecorationLine: 'line-through',
+  },
+  reminderLabel: {
+    marginTop: 1,
+    color: '#96958f',
+    fontFamily: 'SpaceMono_400Regular',
+    fontSize: 8,
   },
   labelButton: {
     minWidth: 0,

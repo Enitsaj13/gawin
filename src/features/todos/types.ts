@@ -4,6 +4,7 @@ export type Todo = {
   completed: boolean;
   date: string;
   recurrenceId?: string;
+  reminderAt?: string;
 };
 
 export type RepeatRule = {
@@ -11,4 +12,5 @@ export type RepeatRule = {
   title: string;
   lastCreatedDate: string;
   active: boolean;
+  daysOfWeek?: number[];
 };

@@ -14,13 +14,14 @@ import type { ViewStyle } from 'react-native';
 import { formatJournalDate } from '@/lib/date';
 
 type TaskComposerProps = {
+  allowSeriesUpdate?: boolean;
   date: string;
   heading?: string;
   initialTitle?: string;
   submitLabel?: string;
   visible: boolean;
   onClose: () => void;
-  onSubmit: (title: string) => void;
+  onSubmit: (title: string, updateSeries: boolean) => void;
 };
 
 type WebViewport = {
@@ -35,6 +36,7 @@ const webScrollLockStyle: ViewStyle & { touchAction: 'none' } = {
 };
 
 export function TaskComposer({
+  allowSeriesUpdate = false,
   date,
   heading = 'New task',
   initialTitle = '',
@@ -44,6 +46,7 @@ export function TaskComposer({
   onSubmit,
 }: TaskComposerProps) {
   const [title, setTitle] = useState(initialTitle);
+  const [updateSeries, setUpdateSeries] = useState(false);
   const [inputFocused, setInputFocused] = useState(false);
   const [webViewport, setWebViewport] = useState<WebViewport | null>(null);
 
@@ -79,7 +82,7 @@ export function TaskComposer({
 
   const submit = () => {
     if (!title.trim()) return;
-    onSubmit(title);
+    onSubmit(title, updateSeries);
     close();
   };
 
@@ -148,6 +151,51 @@ export function TaskComposer({
               ]}
               value={title}
             />
+            {allowSeriesUpdate ? (
+              <View style={styles.scopePicker}>
+                <Text style={styles.scopeLabel}>Apply changes to</Text>
+                <View style={styles.scopeOptions}>
+                  <Pressable
+                    accessibilityRole="radio"
+                    accessibilityState={{ checked: !updateSeries }}
+                    onPress={() => setUpdateSeries(false)}
+                    style={({ pressed }) => [
+                      styles.scopeOption,
+                      !updateSeries && styles.scopeOptionSelected,
+                      pressed && styles.pressed,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.scopeOptionText,
+                        !updateSeries && styles.scopeOptionTextSelected,
+                      ]}
+                    >
+                      Today only
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    accessibilityRole="radio"
+                    accessibilityState={{ checked: updateSeries }}
+                    onPress={() => setUpdateSeries(true)}
+                    style={({ pressed }) => [
+                      styles.scopeOption,
+                      updateSeries && styles.scopeOptionSelected,
+                      pressed && styles.pressed,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.scopeOptionText,
+                        updateSeries && styles.scopeOptionTextSelected,
+                      ]}
+                    >
+                      Today & future
+                    </Text>
+                  </Pressable>
+                </View>
+              </View>
+            ) : null}
             <View style={styles.actions}>
               <Pressable
                 accessibilityLabel="Cancel task editor"
@@ -232,6 +280,40 @@ const styles = StyleSheet.create({
     marginTop: 24,
     flexDirection: 'row',
     gap: 10,
+  },
+  scopePicker: {
+    marginTop: 20,
+  },
+  scopeLabel: {
+    color: '#777671',
+    fontFamily: 'SpaceMono_400Regular',
+    fontSize: 9,
+    textTransform: 'uppercase',
+  },
+  scopeOptions: {
+    marginTop: 8,
+    flexDirection: 'row',
+    gap: 8,
+  },
+  scopeOption: {
+    minHeight: 38,
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#8c8b86',
+  },
+  scopeOptionSelected: {
+    borderColor: '#111111',
+    backgroundColor: '#111111',
+  },
+  scopeOptionText: {
+    color: '#555550',
+    fontFamily: 'SpaceMono_700Bold',
+    fontSize: 9,
+  },
+  scopeOptionTextSelected: {
+    color: '#ffffff',
   },
   cancel: {
     minHeight: 50,

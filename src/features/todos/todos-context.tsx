@@ -6,12 +6,13 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 import { AppState } from 'react-native';
 
 import { useToast } from '@/components/toast';
-import { shiftDateKey, todayKey } from '@/lib/date';
+import { fromDateKey, shiftDateKey, todayKey } from '@/lib/date';
 
 import {
   createTodoBackup,
@@ -19,31 +20,54 @@ import {
   RestoreMode,
   TodoBackup,
 } from './backup';
+import {
+  cancelTaskReminder,
+  getScheduledReminderIds,
+  scheduleTaskReminder,
+} from './reminders';
 import { RepeatRule, Todo } from './types';
 
 const STORAGE_KEY = 'gawin.tasks.v2';
 const REPEAT_STORAGE_KEY = 'gawin.repeat-rules.v1';
 const LEGACY_STORAGE_KEY = 'todo-journal.tasks.v2';
 const LEGACY_REPEAT_STORAGE_KEY = 'todo-journal.repeat-rules.v1';
+const REMINDER_IDS_STORAGE_KEY = 'gawin.reminder-ids.v1';
+const LAST_REVIEW_DATE_STORAGE_KEY = 'gawin.last-review-date.v1';
 const OBSOLETE_STORAGE_KEYS = ['todo-journal.tasks.v1'];
+const EVERY_DAY = [0, 1, 2, 3, 4, 5, 6];
+
+export type ReviewAction = 'delete' | 'keep' | 'move';
 
 type TodosContextValue = {
   activeRepeatCount: number;
+  dailyDefaults: RepeatRule[];
   isReady: boolean;
   today: string;
   todos: Todo[];
+  pendingReviewTodos: Todo[];
+  addDailyDefault: (title: string) => void;
   addTodo: (title: string, date: string) => void;
+  clearTodoReminder: (id: string) => void;
   createBackup: () => TodoBackup;
   deleteTodo: (id: string) => void;
-  editTodo: (id: string, title: string) => void;
+  deleteTodoSeries: (id: string) => void;
+  deleteDailyDefault: (id: string) => void;
+  duplicateTodo: (id: string) => void;
+  editDailyDefault: (id: string, title: string) => void;
+  editTodo: (id: string, title: string, updateSeries?: boolean) => void;
   getTodosForDate: (date: string) => Todo[];
+  getRepeatDays: (todo: Todo) => number[] | null;
   isTodoRepeating: (todo: Todo) => boolean;
   moveTodoToToday: (id: string) => void;
   reorderTodo: (date: string, id: string, toIndex: number) => void;
+  reorderDailyDefault: (id: string, toIndex: number) => void;
   repeatTodoTomorrow: (id: string) => void;
+  reviewUnfinishedTodos: (action: ReviewAction, ids?: string[]) => void;
   restoreBackup: (backup: TodoBackup, mode: RestoreMode) => void;
-  startDailyRepeat: (id: string) => void;
-  stopDailyRepeat: (id: string) => void;
+  setTodoReminder: (id: string, reminderAt: string) => Promise<void>;
+  startRepeat: (id: string, daysOfWeek: number[]) => void;
+  stopRepeat: (id: string) => void;
+  toggleDailyDefault: (id: string) => void;
   toggleTodo: (id: string) => void;
 };
 
@@ -66,9 +90,18 @@ function applyUpdate<T>(update: ValueUpdater<T>, current: T) {
     : update;
 }
 
-function ensureDailyRepeats(data: TodosData, date: string): TodosData {
+function isDailyRule(rule: RepeatRule) {
+  const days = rule.daysOfWeek ?? EVERY_DAY;
+  return days.length === 7 && EVERY_DAY.every((day) => days.includes(day));
+}
+
+function ensureScheduledRepeats(data: TodosData, date: string): TodosData {
+  const weekday = fromDateKey(date).getDay();
   const dueRules = data.repeatRules.filter(
-    (rule) => rule.active && rule.lastCreatedDate < date,
+    (rule) =>
+      rule.active &&
+      rule.lastCreatedDate < date &&
+      (rule.daysOfWeek ?? EVERY_DAY).includes(weekday),
   );
   if (!dueRules.length) return data;
 
@@ -96,6 +129,23 @@ function ensureDailyRepeats(data: TodosData, date: string): TodosData {
   };
 }
 
+function withoutExpiredReminders(data: TodosData): TodosData {
+  const now = Date.now();
+  let changed = false;
+  const nextTodos = data.todos.map((todo) => {
+    if (!todo.reminderAt || new Date(todo.reminderAt).getTime() > now) {
+      return todo;
+    }
+
+    changed = true;
+    const next = { ...todo };
+    delete next.reminderAt;
+    return next;
+  });
+
+  return changed ? { ...data, todos: nextTodos } : data;
+}
+
 export function TodosProvider({ children }: PropsWithChildren) {
   const [data, setData] = useState<TodosData>({
     todos: [],
@@ -103,6 +153,10 @@ export function TodosProvider({ children }: PropsWithChildren) {
   });
   const [activeDate, setActiveDate] = useState(todayKey);
   const [isReady, setIsReady] = useState(false);
+  const [lastReviewDate, setLastReviewDate] = useState('');
+  const [reminderIds, setReminderIds] = useState<Record<string, string>>({});
+  const [remindersReady, setRemindersReady] = useState(false);
+  const schedulingReminderIdsRef = useRef(new Set<string>());
   const { showToast } = useToast();
   const { repeatRules, todos } = data;
 
@@ -134,13 +188,15 @@ export function TodosProvider({ children }: PropsWithChildren) {
           REPEAT_STORAGE_KEY,
           LEGACY_STORAGE_KEY,
           LEGACY_REPEAT_STORAGE_KEY,
+          REMINDER_IDS_STORAGE_KEY,
+          LAST_REVIEW_DATE_STORAGE_KEY,
         ]);
         if (!isMounted) return;
 
         const storedTodos = storedValues[0][1] ?? storedValues[2][1];
         const storedRepeatRules = storedValues[1][1] ?? storedValues[3][1];
         setData(
-          ensureDailyRepeats(
+          withoutExpiredReminders(ensureScheduledRepeats(
             {
               todos: storedTodos
                 ? (JSON.parse(storedTodos) as Todo[])
@@ -150,14 +206,33 @@ export function TodosProvider({ children }: PropsWithChildren) {
                 : [],
             },
             todayKey(),
+          )),
+        );
+        const scheduledIds = await getScheduledReminderIds().catch(
+          () => new Set<string>(),
+        );
+        if (!isMounted) return;
+        const storedReminderIds = storedValues[4][1]
+          ? (JSON.parse(storedValues[4][1]) as Record<string, string>)
+          : {};
+        setReminderIds(
+          Object.fromEntries(
+            Object.entries(storedReminderIds).filter(([, identifier]) =>
+              scheduledIds.has(identifier),
+            ),
           ),
         );
+        setLastReviewDate(storedValues[5][1] ?? '');
       } catch {
         if (isMounted) {
           setData({ todos: [], repeatRules: [] });
+          setReminderIds({});
         }
       } finally {
-        if (isMounted) setIsReady(true);
+        if (isMounted) {
+          setRemindersReady(true);
+          setIsReady(true);
+        }
       }
     }
 
@@ -173,7 +248,9 @@ export function TodosProvider({ children }: PropsWithChildren) {
       if (state === 'active') {
         const date = todayKey();
         setActiveDate(date);
-        setData((current) => ensureDailyRepeats(current, date));
+        setData((current) =>
+          withoutExpiredReminders(ensureScheduledRepeats(current, date)),
+        );
       }
     });
 
@@ -187,6 +264,64 @@ export function TodosProvider({ children }: PropsWithChildren) {
       [REPEAT_STORAGE_KEY, JSON.stringify(repeatRules)],
     ]);
   }, [isReady, repeatRules, todos]);
+
+  useEffect(() => {
+    if (!remindersReady) return;
+    void AsyncStorage.setItem(
+      REMINDER_IDS_STORAGE_KEY,
+      JSON.stringify(reminderIds),
+    );
+  }, [reminderIds, remindersReady]);
+
+  useEffect(() => {
+    if (!isReady || !remindersReady) return;
+
+    const futureReminders = new Map(
+      todos
+        .filter(
+          (todo) =>
+            todo.reminderAt && new Date(todo.reminderAt).getTime() > Date.now(),
+        )
+        .map((todo) => [todo.id, todo] as const),
+    );
+
+    for (const [todoId, identifier] of Object.entries(reminderIds)) {
+      if (futureReminders.has(todoId)) continue;
+
+      void cancelTaskReminder(identifier)
+        .catch(() => undefined)
+        .finally(() => {
+          setReminderIds((current) => {
+            if (!current[todoId]) return current;
+            const next = { ...current };
+            delete next[todoId];
+            return next;
+          });
+        });
+    }
+
+    for (const todo of futureReminders.values()) {
+      if (
+        reminderIds[todo.id] ||
+        schedulingReminderIdsRef.current.has(todo.id) ||
+        !todo.reminderAt
+      ) {
+        continue;
+      }
+
+      schedulingReminderIdsRef.current.add(todo.id);
+      void scheduleTaskReminder(todo.title, todo.reminderAt, false)
+        .then((identifier) => {
+          if (identifier) {
+            setReminderIds((current) => ({
+              ...current,
+              [todo.id]: identifier,
+            }));
+          }
+        })
+        .finally(() => schedulingReminderIdsRef.current.delete(todo.id));
+    }
+  }, [isReady, reminderIds, remindersReady, todos]);
 
   const addTodo = useCallback(
     (title: string, date: string) => {
@@ -205,6 +340,160 @@ export function TodosProvider({ children }: PropsWithChildren) {
       showToast('Task created', 'create');
     },
     [setTodos, showToast],
+  );
+
+  const addDailyDefault = useCallback(
+    (title: string) => {
+      const cleanTitle = title.trim();
+      if (!cleanTitle) return;
+
+      const recurrenceId = createId('repeat');
+      setData((current) =>
+        ensureScheduledRepeats(
+          {
+            todos: current.todos,
+            repeatRules: [
+              ...current.repeatRules,
+              {
+                id: recurrenceId,
+                title: cleanTitle,
+                lastCreatedDate: shiftDateKey(activeDate, -1),
+                active: true,
+                daysOfWeek: [...EVERY_DAY],
+              },
+            ],
+          },
+          activeDate,
+        ),
+      );
+      showToast('Daily default added', 'create');
+    },
+    [activeDate, showToast],
+  );
+
+  const editDailyDefault = useCallback(
+    (id: string, title: string) => {
+      const cleanTitle = title.trim();
+      if (!cleanTitle) return;
+
+      setData((current) => ({
+        todos: current.todos.map((todo) =>
+          todo.recurrenceId === id && todo.date === activeDate
+            ? { ...todo, title: cleanTitle }
+            : todo,
+        ),
+        repeatRules: current.repeatRules.map((rule) =>
+          rule.id === id ? { ...rule, title: cleanTitle } : rule,
+        ),
+      }));
+      showToast('Daily default updated', 'edit');
+    },
+    [activeDate, showToast],
+  );
+
+  const toggleDailyDefault = useCallback(
+    (id: string) => {
+      const rule = repeatRules.find((item) => item.id === id);
+      if (!rule) return;
+
+      const willEnable = !rule.active;
+      setData((current) => {
+        const hasTodayTask = current.todos.some(
+          (todo) =>
+            todo.recurrenceId === id && todo.date === activeDate,
+        );
+        const next = {
+          ...current,
+          repeatRules: current.repeatRules.map((item) =>
+            item.id === id
+              ? {
+                  ...item,
+                  active: willEnable,
+                  lastCreatedDate:
+                    willEnable && !hasTodayTask
+                      ? shiftDateKey(activeDate, -1)
+                      : item.lastCreatedDate,
+                }
+              : item,
+          ),
+        };
+        return willEnable
+          ? ensureScheduledRepeats(next, activeDate)
+          : next;
+      });
+      showToast(
+        willEnable ? 'Daily default enabled' : 'Daily default paused',
+        'repeat',
+      );
+    },
+    [activeDate, repeatRules, showToast],
+  );
+
+  const deleteDailyDefault = useCallback(
+    (id: string) => {
+      const deletedRule = repeatRules.find((rule) => rule.id === id);
+      if (!deletedRule) return;
+
+      setData((current) => ({
+        todos: current.todos.map((todo) => {
+          if (todo.recurrenceId !== id) return todo;
+          const next = { ...todo };
+          delete next.recurrenceId;
+          return next;
+        }),
+        repeatRules: current.repeatRules.filter((rule) => rule.id !== id),
+      }));
+      showToast('Daily default removed', 'delete');
+    },
+    [repeatRules, showToast],
+  );
+
+  const reorderDailyDefault = useCallback(
+    (id: string, toIndex: number) => {
+      setRepeatRules((current) => {
+        const dailyRules = current.filter(isDailyRule);
+        const fromIndex = dailyRules.findIndex((rule) => rule.id === id);
+        const nextIndex = Math.min(
+          Math.max(toIndex, 0),
+          dailyRules.length - 1,
+        );
+        if (fromIndex < 0 || fromIndex === nextIndex) return current;
+
+        const reordered = [...dailyRules];
+        const [movedRule] = reordered.splice(fromIndex, 1);
+        reordered.splice(nextIndex, 0, movedRule);
+
+        let dailyIndex = 0;
+        return current.map((rule) =>
+          isDailyRule(rule) ? reordered[dailyIndex++] : rule,
+        );
+      });
+    },
+    [setRepeatRules],
+  );
+
+  const duplicateTodo = useCallback(
+    (id: string) => {
+      const source = todos.find((todo) => todo.id === id);
+      if (!source) return;
+
+      setTodos((current) => {
+        const sourceIndex = current.findIndex((todo) => todo.id === id);
+        if (sourceIndex < 0) return current;
+
+        const copy: Todo = {
+          id: createId(),
+          title: source.title,
+          completed: false,
+          date: source.date,
+        };
+        const next = [...current];
+        next.splice(sourceIndex + 1, 0, copy);
+        return next;
+      });
+      showToast('Task duplicated', 'create');
+    },
+    [setTodos, showToast, todos],
   );
 
   const toggleTodo = useCallback((id: string) => {
@@ -245,8 +534,40 @@ export function TodosProvider({ children }: PropsWithChildren) {
     [setTodos, showToast, todos],
   );
 
+  const deleteTodoSeries = useCallback(
+    (id: string) => {
+      const todo = todos.find((item) => item.id === id);
+      if (!todo?.recurrenceId) {
+        deleteTodo(id);
+        return;
+      }
+
+      const previousData = data;
+      const recurrenceId = todo.recurrenceId;
+      setData((current) => ({
+        todos: current.todos
+          .filter((item) => item.id !== id)
+          .map((item) => {
+            if (item.recurrenceId !== recurrenceId) return item;
+            const next = { ...item };
+            delete next.recurrenceId;
+            return next;
+          }),
+        repeatRules: current.repeatRules.filter(
+          (rule) => rule.id !== recurrenceId,
+        ),
+      }));
+      showToast('Task and future repeats deleted', 'delete', {
+        actionLabel: 'Undo',
+        duration: 4000,
+        onAction: () => setData(previousData),
+      });
+    },
+    [data, deleteTodo, showToast, todos],
+  );
+
   const editTodo = useCallback(
-    (id: string, title: string) => {
+    (id: string, title: string, updateSeries = false) => {
       const cleanTitle = title.trim();
       if (!cleanTitle) return;
 
@@ -257,7 +578,7 @@ export function TodosProvider({ children }: PropsWithChildren) {
         ),
       );
 
-      if (editedTodo?.recurrenceId) {
+      if (editedTodo?.recurrenceId && updateSeries) {
         setRepeatRules((current) =>
           current.map((rule) =>
             rule.id === editedTodo.recurrenceId && rule.active
@@ -267,9 +588,23 @@ export function TodosProvider({ children }: PropsWithChildren) {
         );
       }
 
+      if (editedTodo?.reminderAt && reminderIds[id]) {
+        const previousIdentifier = reminderIds[id];
+        void scheduleTaskReminder(cleanTitle, editedTodo.reminderAt, false)
+          .then((identifier) => {
+            if (identifier) {
+              void cancelTaskReminder(previousIdentifier).catch(
+                () => undefined,
+              );
+              setReminderIds((current) => ({ ...current, [id]: identifier }));
+            }
+          })
+          .catch(() => undefined);
+      }
+
       showToast('Task updated', 'edit');
     },
-    [setRepeatRules, setTodos, showToast, todos],
+    [reminderIds, setRepeatRules, setTodos, showToast, todos],
   );
 
   const moveTodoToToday = useCallback(
@@ -286,6 +621,51 @@ export function TodosProvider({ children }: PropsWithChildren) {
       showToast('Moved to today', 'move');
     },
     [activeDate, setTodos, showToast],
+  );
+
+  const reviewUnfinishedTodos = useCallback(
+    (action: ReviewAction, ids: string[] = []) => {
+      const selectedIds = new Set(ids);
+      if (action === 'move' && selectedIds.size) {
+        setTodos((current) => [
+          ...current.filter((todo) => !selectedIds.has(todo.id)),
+          ...current
+            .filter((todo) => selectedIds.has(todo.id))
+            .map((todo) => ({ ...todo, date: activeDate })),
+        ]);
+        showToast(
+          `${selectedIds.size} ${selectedIds.size === 1 ? 'task' : 'tasks'} moved`,
+          'move',
+        );
+      }
+
+      if (action === 'delete' && selectedIds.size) {
+        const deletedTodos = todos.filter((todo) => selectedIds.has(todo.id));
+        setTodos((current) =>
+          current.filter((todo) => !selectedIds.has(todo.id)),
+        );
+        showToast(
+          `${selectedIds.size} ${selectedIds.size === 1 ? 'task' : 'tasks'} deleted`,
+          'delete',
+          {
+            actionLabel: 'Undo',
+            duration: 4000,
+            onAction: () =>
+              setTodos((current) => {
+                const existing = new Set(current.map((todo) => todo.id));
+                return [
+                  ...current,
+                  ...deletedTodos.filter((todo) => !existing.has(todo.id)),
+                ];
+              }),
+          },
+        );
+      }
+
+      setLastReviewDate(activeDate);
+      void AsyncStorage.setItem(LAST_REVIEW_DATE_STORAGE_KEY, activeDate);
+    },
+    [activeDate, setTodos, showToast, todos],
   );
 
   const reorderTodo = useCallback(
@@ -332,42 +712,58 @@ export function TodosProvider({ children }: PropsWithChildren) {
     [activeDate, setTodos, showToast, todos],
   );
 
-  const startDailyRepeat = useCallback(
-    (id: string) => {
+  const startRepeat = useCallback(
+    (id: string, daysOfWeek: number[]) => {
       const todo = todos.find((item) => item.id === id);
-      if (!todo) return;
+      const cleanDays = [...new Set(daysOfWeek)]
+        .filter((day) => Number.isInteger(day) && day >= 0 && day <= 6)
+        .sort();
+      if (!todo || !cleanDays.length) return;
 
       const existingRule = todo.recurrenceId
         ? repeatRules.find((rule) => rule.id === todo.recurrenceId)
         : undefined;
-      if (existingRule?.active) return;
-
-      const recurrenceId = createId('repeat');
+      const recurrenceId = existingRule?.id ?? createId('repeat');
       setData((current) =>
-        ensureDailyRepeats(
+        ensureScheduledRepeats(
           {
             todos: current.todos.map((item) =>
               item.id === id ? { ...item, recurrenceId } : item,
             ),
-            repeatRules: [
-              ...current.repeatRules,
-              {
-                id: recurrenceId,
-                title: todo.title,
-                lastCreatedDate: todo.date,
-                active: true,
-              },
-            ],
+            repeatRules: existingRule
+              ? current.repeatRules.map((rule) =>
+                  rule.id === existingRule.id
+                    ? { ...rule, active: true, daysOfWeek: cleanDays }
+                    : rule,
+                )
+              : [
+                  ...current.repeatRules,
+                  {
+                    id: recurrenceId,
+                    title: todo.title,
+                    lastCreatedDate: todo.date,
+                    active: true,
+                    daysOfWeek: cleanDays,
+                  },
+                ],
           },
           activeDate,
         ),
       );
-      showToast('Repeats daily', 'repeat');
+      const label =
+        cleanDays.length === 7
+          ? 'Repeats daily'
+          : cleanDays.join(',') === '1,2,3,4,5'
+            ? 'Repeats on weekdays'
+            : cleanDays.join(',') === '0,6'
+              ? 'Repeats on weekends'
+              : 'Repeat schedule saved';
+      showToast(label, 'repeat');
     },
     [activeDate, repeatRules, showToast, todos],
   );
 
-  const stopDailyRepeat = useCallback(
+  const stopRepeat = useCallback(
     (id: string) => {
       const todo = todos.find((item) => item.id === id);
       if (!todo?.recurrenceId) return;
@@ -377,9 +773,65 @@ export function TodosProvider({ children }: PropsWithChildren) {
           rule.id === todo.recurrenceId ? { ...rule, active: false } : rule,
         ),
       );
-      showToast('Daily repeat stopped', 'repeat');
+      showToast('Repeat stopped', 'repeat');
     },
     [setRepeatRules, showToast, todos],
+  );
+
+  const setTodoReminder = useCallback(
+    async (id: string, reminderAt: string) => {
+      const todo = todos.find((item) => item.id === id);
+      if (!todo || new Date(reminderAt).getTime() <= Date.now()) return;
+
+      const previousIdentifier = reminderIds[id];
+      const identifier = await scheduleTaskReminder(
+        todo.title,
+        reminderAt,
+        true,
+      ).catch(() => null);
+      if (!identifier) {
+        showToast('Reminders are unavailable', 'reminder');
+        return;
+      }
+
+      if (previousIdentifier) {
+        await cancelTaskReminder(previousIdentifier).catch(() => undefined);
+      }
+
+      setReminderIds((current) => ({ ...current, [id]: identifier }));
+      setTodos((current) =>
+        current.map((item) =>
+          item.id === id ? { ...item, reminderAt } : item,
+        ),
+      );
+      showToast('Reminder set', 'reminder');
+    },
+    [reminderIds, setTodos, showToast, todos],
+  );
+
+  const clearTodoReminder = useCallback(
+    (id: string) => {
+      const identifier = reminderIds[id];
+      if (identifier) {
+        void cancelTaskReminder(identifier).catch(() => undefined);
+      }
+      setReminderIds((current) => {
+        if (!current[id]) return current;
+        const next = { ...current };
+        delete next[id];
+        return next;
+      });
+      setTodos((current) =>
+        current.map((todo) => {
+          if (todo.id !== id || !todo.reminderAt) return todo;
+          const next = { ...todo };
+          delete next.reminderAt;
+          return next;
+        }),
+      );
+      showToast('Reminder removed', 'reminder');
+    },
+    [reminderIds, setTodos, showToast],
   );
 
   const getTodosForDate = useCallback(
@@ -395,6 +847,17 @@ export function TodosProvider({ children }: PropsWithChildren) {
             (rule) => rule.id === todo.recurrenceId && rule.active,
           ),
       ),
+    [repeatRules],
+  );
+
+  const getRepeatDays = useCallback(
+    (todo: Todo) => {
+      if (!todo.recurrenceId) return null;
+      const rule = repeatRules.find(
+        (item) => item.id === todo.recurrenceId && item.active,
+      );
+      return rule ? [...(rule.daysOfWeek ?? EVERY_DAY)] : null;
+    },
     [repeatRules],
   );
 
@@ -414,7 +877,11 @@ export function TodosProvider({ children }: PropsWithChildren) {
               repeatRules: backup.repeatRules.map((rule) => ({ ...rule })),
             };
 
-      setData(ensureDailyRepeats(restoredData, activeDate));
+      setData(
+        withoutExpiredReminders(
+          ensureScheduledRepeats(restoredData, activeDate),
+        ),
+      );
       showToast(mode === 'merge' ? 'Backup merged' : 'Backup restored', 'backup', {
         actionLabel: 'Undo',
         duration: 6000,
@@ -425,44 +892,81 @@ export function TodosProvider({ children }: PropsWithChildren) {
   );
 
   const activeRepeatCount = repeatRules.filter((rule) => rule.active).length;
+  const dailyDefaults = useMemo(
+    () => repeatRules.filter(isDailyRule),
+    [repeatRules],
+  );
+  const pendingReviewTodos = useMemo(() => {
+    if (!isReady || lastReviewDate === activeDate) return [];
+    const yesterday = shiftDateKey(activeDate, -1);
+    return todos.filter(
+      (todo) => todo.date === yesterday && !todo.completed,
+    );
+  }, [activeDate, isReady, lastReviewDate, todos]);
 
   const value = useMemo(
     () => ({
       activeRepeatCount,
+      dailyDefaults,
       isReady,
       today: activeDate,
       todos,
+      pendingReviewTodos,
+      addDailyDefault,
       addTodo,
+      clearTodoReminder,
       createBackup,
       deleteTodo,
+      deleteTodoSeries,
+      deleteDailyDefault,
+      duplicateTodo,
+      editDailyDefault,
       editTodo,
       getTodosForDate,
+      getRepeatDays,
       isTodoRepeating,
       moveTodoToToday,
       reorderTodo,
+      reorderDailyDefault,
       repeatTodoTomorrow,
+      reviewUnfinishedTodos,
       restoreBackup,
-      startDailyRepeat,
-      stopDailyRepeat,
+      setTodoReminder,
+      startRepeat,
+      stopRepeat,
+      toggleDailyDefault,
       toggleTodo,
     }),
     [
       isReady,
       activeRepeatCount,
+      dailyDefaults,
       activeDate,
       todos,
+      pendingReviewTodos,
+      addDailyDefault,
       addTodo,
+      clearTodoReminder,
       createBackup,
       deleteTodo,
+      deleteTodoSeries,
+      deleteDailyDefault,
+      duplicateTodo,
+      editDailyDefault,
       editTodo,
       getTodosForDate,
+      getRepeatDays,
       isTodoRepeating,
       moveTodoToToday,
       reorderTodo,
+      reorderDailyDefault,
       repeatTodoTomorrow,
+      reviewUnfinishedTodos,
       restoreBackup,
-      startDailyRepeat,
-      stopDailyRepeat,
+      setTodoReminder,
+      startRepeat,
+      stopRepeat,
+      toggleDailyDefault,
       toggleTodo,
     ],
   );

@@ -1,0 +1,348 @@
+import { router } from 'expo-router';
+import { useEffect, useRef, useState } from 'react';
+import {
+  Animated,
+  Easing,
+  Modal,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+import {
+  useFeedback,
+  usePreferences,
+} from '@/features/preferences/preferences-context';
+
+type AppMenuSheetProps = {
+  onClose: () => void;
+};
+
+export function AppMenuSheet({ onClose }: AppMenuSheetProps) {
+  const insets = useSafeAreaInsets();
+  const feedback = useFeedback();
+  const { preferences } = usePreferences();
+  const [backdropOpacity] = useState(() => new Animated.Value(0));
+  const [translateY] = useState(() => new Animated.Value(32));
+  const closingRef = useRef(false);
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(backdropOpacity, {
+        duration: preferences.reducedMotion ? 0 : 170,
+        easing: Easing.out(Easing.quad),
+        toValue: 1,
+        useNativeDriver: true,
+      }),
+      Animated.timing(translateY, {
+        duration: preferences.reducedMotion ? 0 : 210,
+        easing: Easing.out(Easing.cubic),
+        toValue: 0,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [backdropOpacity, preferences.reducedMotion, translateY]);
+
+  const dismiss = (destination?: '/defaults' | '/settings') => {
+    if (closingRef.current) return;
+    closingRef.current = true;
+
+    Animated.parallel([
+      Animated.timing(backdropOpacity, {
+        duration: preferences.reducedMotion ? 0 : 140,
+        easing: Easing.in(Easing.quad),
+        toValue: 0,
+        useNativeDriver: true,
+      }),
+      Animated.timing(translateY, {
+        duration: preferences.reducedMotion ? 0 : 160,
+        easing: Easing.in(Easing.cubic),
+        toValue: 32,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      onClose();
+      if (destination) router.push(destination);
+    });
+  };
+
+  const navigate = (destination: '/defaults' | '/settings') => {
+    feedback.selection();
+    dismiss(destination);
+  };
+
+  return (
+    <Modal
+      animationType="none"
+      onRequestClose={() => dismiss()}
+      statusBarTranslucent
+      transparent
+      visible
+    >
+      <View style={styles.modalRoot}>
+        <Animated.View
+          pointerEvents="none"
+          style={[styles.scrim, { opacity: backdropOpacity }]}
+        />
+        <Pressable
+          accessibilityLabel="Close Gawin menu"
+          accessibilityRole="button"
+          onPress={() => dismiss()}
+          style={StyleSheet.absoluteFill}
+        />
+        <Animated.View
+          accessibilityViewIsModal
+          style={[
+            styles.sheet,
+            {
+              paddingBottom: Math.max(insets.bottom, 18),
+              transform: [{ translateY }],
+            },
+          ]}
+        >
+          <View style={styles.content}>
+            <Text style={styles.eyebrow}>Gawin</Text>
+            <Text style={styles.title}>More</Text>
+
+            <View style={styles.actionList}>
+              <Pressable
+                accessibilityLabel="Open daily defaults"
+                accessibilityRole="button"
+                onPress={() => navigate('/defaults')}
+                style={({ pressed }) => [
+                  styles.actionRow,
+                  pressed && styles.pressed,
+                ]}
+              >
+                <RepeatIcon />
+                <View style={styles.actionCopy}>
+                  <Text style={styles.actionText}>Daily defaults</Text>
+                  <Text style={styles.actionMeta}>
+                    Tasks that arrive fresh each morning
+                  </Text>
+                </View>
+                <Text style={styles.arrow}>→</Text>
+              </Pressable>
+
+              <Pressable
+                accessibilityLabel="Open settings"
+                accessibilityRole="button"
+                onPress={() => navigate('/settings')}
+                style={({ pressed }) => [
+                  styles.actionRow,
+                  pressed && styles.pressed,
+                ]}
+              >
+                <SettingsIcon />
+                <View style={styles.actionCopy}>
+                  <Text style={styles.actionText}>Settings</Text>
+                  <Text style={styles.actionMeta}>
+                    Preferences, backup, and app details
+                  </Text>
+                </View>
+                <Text style={styles.arrow}>→</Text>
+              </Pressable>
+            </View>
+
+            <Pressable
+              accessibilityLabel="Close Gawin menu"
+              accessibilityRole="button"
+              onPress={() => dismiss()}
+              style={({ pressed }) => [
+                styles.cancel,
+                pressed && styles.pressed,
+              ]}
+            >
+              <Text style={styles.cancelText}>Cancel</Text>
+            </Pressable>
+          </View>
+        </Animated.View>
+      </View>
+    </Modal>
+  );
+}
+
+function RepeatIcon() {
+  return (
+    <View style={styles.icon}>
+      <View style={styles.repeatTopLine} />
+      <View style={styles.repeatTopArrow} />
+      <View style={styles.repeatBottomLine} />
+      <View style={styles.repeatBottomArrow} />
+    </View>
+  );
+}
+
+function SettingsIcon() {
+  return (
+    <View style={styles.icon}>
+      <View style={[styles.settingLine, styles.settingLineTop]} />
+      <View style={[styles.settingKnob, styles.settingKnobTop]} />
+      <View style={[styles.settingLine, styles.settingLineBottom]} />
+      <View style={[styles.settingKnob, styles.settingKnobBottom]} />
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  modalRoot: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  scrim: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.42)',
+  },
+  sheet: {
+    width: '100%',
+    maxWidth: 560,
+    alignSelf: 'center',
+    borderTopWidth: 1,
+    borderColor: '#111111',
+    backgroundColor: '#fbfbf9',
+  },
+  content: {
+    paddingHorizontal: 24,
+    paddingTop: 26,
+  },
+  eyebrow: {
+    color: '#74736e',
+    fontFamily: 'SpaceMono_400Regular',
+    fontSize: 10,
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+  },
+  title: {
+    marginTop: 5,
+    color: '#111111',
+    fontFamily: 'SpaceMono_700Bold',
+    fontSize: 21,
+    letterSpacing: -0.8,
+  },
+  actionList: {
+    marginTop: 23,
+    borderTopWidth: 1,
+    borderColor: '#c9c8c3',
+  },
+  actionRow: {
+    minHeight: 62,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 11,
+    borderBottomWidth: 1,
+    borderColor: '#c9c8c3',
+  },
+  actionCopy: {
+    minWidth: 0,
+    flex: 1,
+  },
+  actionText: {
+    color: '#242422',
+    fontFamily: 'SpaceMono_700Bold',
+    fontSize: 11,
+  },
+  actionMeta: {
+    marginTop: 2,
+    color: '#898883',
+    fontFamily: 'SpaceMono_400Regular',
+    fontSize: 8,
+  },
+  arrow: {
+    color: '#343432',
+    fontFamily: 'SpaceMono_400Regular',
+    fontSize: 14,
+  },
+  icon: {
+    width: 14,
+    height: 14,
+  },
+  repeatTopLine: {
+    position: 'absolute',
+    top: 3,
+    left: 1,
+    width: 10,
+    height: 1.25,
+    backgroundColor: '#242422',
+  },
+  repeatTopArrow: {
+    position: 'absolute',
+    top: 1,
+    right: 1,
+    width: 4,
+    height: 4,
+    borderTopWidth: 1.25,
+    borderRightWidth: 1.25,
+    borderColor: '#242422',
+    transform: [{ rotate: '45deg' }],
+  },
+  repeatBottomLine: {
+    position: 'absolute',
+    right: 1,
+    bottom: 3,
+    width: 10,
+    height: 1.25,
+    backgroundColor: '#242422',
+  },
+  repeatBottomArrow: {
+    position: 'absolute',
+    bottom: 1,
+    left: 1,
+    width: 4,
+    height: 4,
+    borderBottomWidth: 1.25,
+    borderLeftWidth: 1.25,
+    borderColor: '#242422',
+    transform: [{ rotate: '45deg' }],
+  },
+  settingLine: {
+    position: 'absolute',
+    right: 1,
+    left: 1,
+    height: 1.25,
+    backgroundColor: '#242422',
+  },
+  settingLineTop: {
+    top: 4,
+  },
+  settingLineBottom: {
+    bottom: 3,
+  },
+  settingKnob: {
+    position: 'absolute',
+    width: 4,
+    height: 4,
+    borderWidth: 1.2,
+    borderColor: '#242422',
+    backgroundColor: '#fbfbf9',
+  },
+  settingKnobTop: {
+    top: 2.5,
+    left: 3,
+  },
+  settingKnobBottom: {
+    right: 3,
+    bottom: 1.5,
+  },
+  cancel: {
+    minHeight: 50,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 10,
+    borderWidth: 1,
+    borderColor: '#111111',
+  },
+  cancelText: {
+    color: '#111111',
+    fontFamily: 'SpaceMono_700Bold',
+    fontSize: 11,
+  },
+  pressed: {
+    opacity: 0.5,
+  },
+});

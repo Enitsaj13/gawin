@@ -18,14 +18,19 @@ function isDateKey(value: string) {
 export default function DayScreen() {
   const [editingTodo, setEditingTodo] = useState<Todo | null>(null);
   const {
+    clearTodoReminder,
     deleteTodo,
+    deleteTodoSeries,
+    duplicateTodo,
     editTodo,
     getTodosForDate,
+    getRepeatDays,
     isTodoRepeating,
     moveTodoToToday,
     repeatTodoTomorrow,
-    startDailyRepeat,
-    stopDailyRepeat,
+    setTodoReminder,
+    startRepeat,
+    stopRepeat,
     today,
     toggleTodo,
   } = useTodos();
@@ -79,15 +84,22 @@ export default function DayScreen() {
               <TaskRow
                 isRepeating={isTodoRepeating(todo)}
                 key={todo.id}
+                onClearReminder={clearTodoReminder}
                 onDelete={deleteTodo}
+                onDeleteSeries={deleteTodoSeries}
+                onDuplicate={duplicateTodo}
                 onEdit={setEditingTodo}
                 onMoveToToday={
                   date < today && !todo.completed ? moveTodoToToday : undefined
                 }
-                onRepeatDaily={startDailyRepeat}
+                onRepeatSchedule={startRepeat}
                 onRepeatTomorrow={repeatTodoTomorrow}
-                onStopRepeating={stopDailyRepeat}
+                onSetReminder={(id, reminderAt) => {
+                  void setTodoReminder(id, reminderAt);
+                }}
+                onStopRepeat={stopRepeat}
                 onToggle={toggleTodo}
+                repeatDays={getRepeatDays(todo)}
                 todo={todo}
               />
             ))
@@ -99,7 +111,7 @@ export default function DayScreen() {
           )}
           {todos.length ? (
             <Text style={styles.deleteHint}>
-              Tap a task to edit · Long press to delete
+              Tap a task to edit · Use ••• for more actions
             </Text>
           ) : null}
         </ScrollView>
@@ -134,12 +146,15 @@ export default function DayScreen() {
 
       {editingTodo ? (
         <TaskComposer
+          allowSeriesUpdate={isTodoRepeating(editingTodo)}
           date={date}
           heading="Edit task"
           initialTitle={editingTodo.title}
           key={editingTodo.id}
           onClose={() => setEditingTodo(null)}
-          onSubmit={(title) => editTodo(editingTodo.id, title)}
+          onSubmit={(title, updateSeries) =>
+            editTodo(editingTodo.id, title, updateSeries)
+          }
           submitLabel="Save changes"
           visible
         />
