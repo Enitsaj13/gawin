@@ -87,6 +87,12 @@ function ThemedApp() {
     document.documentElement.style.colorScheme = isDark ? 'dark' : 'light';
     document.documentElement.style.backgroundColor = colors.background;
     document.body.style.backgroundColor = colors.background;
+    document
+      .querySelector('meta[name="theme-color"]')
+      ?.setAttribute('content', colors.background);
+    document
+      .querySelector('meta[name="apple-mobile-web-app-status-bar-style"]')
+      ?.setAttribute('content', isDark ? 'black' : 'default');
   }, [colors.background, isDark]);
 
   return (
