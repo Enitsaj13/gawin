@@ -20,6 +20,6 @@ const styles = StyleSheet.create({
     fontSize: 42,
     lineHeight: 44,
     textAlignVertical: 'center',
-    transform: [{ translateY: Platform.OS === 'web' ? -3 : 4 }],
+    transform: [{ translateY: Platform.OS === 'web' ? -5 : 2 }],
   },
 });
