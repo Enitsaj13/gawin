@@ -12,14 +12,21 @@ The name comes from the Filipino word _gawin_—to do or get something done.
 
 - A focused home screen that shows only today's tasks
 - Task creation, editing, completion, and deletion with undo
+- Drag-and-drop ordering and task duplication
 - A separate history for browsing tasks from previous dates
+- Search across task history
 - The option to move unfinished past tasks back to today
-- Daily repeating tasks for simple routines
+- A new-day review for unfinished tasks
+- Manageable daily defaults that create one fresh Today task each day
+- Repeating schedules for daily, weekday, weekend, or selected-day routines
+- Optional local task reminders
 - Minimalist action sheets, toast messages, and tactile feedback
+- Preferences for haptics, reduced motion, and backup reminders
 - Fully offline storage with no account required
 - Installable PWA support for iPhone, Android, and desktop browsers
 - Manual JSON backup and restore using files you control
 - Safe backup previews with merge and replace options
+- A visible last-backup status without automatic uploads
 
 ## Privacy and backups
 
@@ -31,6 +38,10 @@ Drive, Google Drive, AirDrop, or another location supported by the device.
 During import, Gawin validates and previews the file before making changes.
 
 Because backup files contain task titles, keep them somewhere private.
+
+Task reminders are scheduled locally. Native builds can deliver them while the
+app is closed; browser reminders are best-effort and require the installed PWA
+to remain open.
 
 ## Built with
 
