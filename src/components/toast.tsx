@@ -12,6 +12,7 @@ import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { usePreferences } from '@/features/preferences/preferences-context';
+import { ThemeColors, useThemeStyles } from '@/theme/theme';
 
 const FLOATING_BUTTON_SIZE = 56;
 const FLOATING_BUTTON_BOTTOM = 18;
@@ -50,6 +51,7 @@ type ToastContextValue = {
 const ToastContext = createContext<ToastContextValue | null>(null);
 
 function ToastActionIcon({ action }: { action: ToastAction }) {
+  const styles = useThemeStyles(createStyles);
   if (action === 'create') {
     return (
       <View style={styles.iconFrame}>
@@ -120,6 +122,7 @@ function ToastActionIcon({ action }: { action: ToastAction }) {
 }
 
 export function ToastProvider({ children }: PropsWithChildren) {
+  const styles = useThemeStyles(createStyles);
   const insets = useSafeAreaInsets();
   const { preferences } = usePreferences();
   const [toastState, setToastState] = useState<ToastState | null>(null);
@@ -268,7 +271,7 @@ export function useToast() {
   return context;
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   root: {
     flex: 1,
   },
@@ -289,7 +292,7 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingHorizontal: 14,
     paddingVertical: 10,
-    backgroundColor: '#111111',
+    backgroundColor: colors.toastBackground,
   },
   iconFrame: {
     width: 14,
@@ -301,7 +304,7 @@ const styles = StyleSheet.create({
     right: 1,
     left: 1,
     height: 1.5,
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.toastText,
   },
   createVertical: {
     position: 'absolute',
@@ -309,7 +312,7 @@ const styles = StyleSheet.create({
     bottom: 1,
     left: 6.25,
     width: 1.5,
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.toastText,
   },
   editPencil: {
     position: 'absolute',
@@ -318,7 +321,7 @@ const styles = StyleSheet.create({
     width: 11,
     height: 4,
     borderWidth: 1.25,
-    borderColor: '#ffffff',
+    borderColor: colors.toastText,
     transform: [{ rotate: '-45deg' }],
   },
   editTip: {
@@ -330,7 +333,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 1.25,
     borderRightWidth: 1.25,
     borderBottomWidth: 1.25,
-    borderColor: '#ffffff',
+    borderColor: colors.toastText,
   },
   deleteHandle: {
     position: 'absolute',
@@ -338,7 +341,7 @@ const styles = StyleSheet.create({
     left: 5,
     width: 4,
     height: 1.25,
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.toastText,
   },
   deleteLid: {
     position: 'absolute',
@@ -346,7 +349,7 @@ const styles = StyleSheet.create({
     left: 2,
     width: 10,
     height: 1.25,
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.toastText,
   },
   deleteBody: {
     position: 'absolute',
@@ -357,7 +360,7 @@ const styles = StyleSheet.create({
     borderRightWidth: 1.25,
     borderBottomWidth: 1.25,
     borderLeftWidth: 1.25,
-    borderColor: '#ffffff',
+    borderColor: colors.toastText,
   },
   moveShaft: {
     position: 'absolute',
@@ -365,7 +368,7 @@ const styles = StyleSheet.create({
     left: 1,
     width: 11,
     height: 1.5,
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.toastText,
   },
   moveArrowTop: {
     position: 'absolute',
@@ -373,7 +376,7 @@ const styles = StyleSheet.create({
     right: 1,
     width: 5,
     height: 1.5,
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.toastText,
     transform: [{ rotate: '45deg' }],
   },
   moveArrowBottom: {
@@ -382,7 +385,7 @@ const styles = StyleSheet.create({
     bottom: 3,
     width: 5,
     height: 1.5,
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.toastText,
     transform: [{ rotate: '-45deg' }],
   },
   repeatTopLine: {
@@ -391,7 +394,7 @@ const styles = StyleSheet.create({
     left: 1,
     width: 10,
     height: 1.25,
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.toastText,
   },
   repeatTopArrow: {
     position: 'absolute',
@@ -401,7 +404,7 @@ const styles = StyleSheet.create({
     height: 4,
     borderTopWidth: 1.25,
     borderRightWidth: 1.25,
-    borderColor: '#ffffff',
+    borderColor: colors.toastText,
     transform: [{ rotate: '45deg' }],
   },
   repeatBottomLine: {
@@ -410,7 +413,7 @@ const styles = StyleSheet.create({
     bottom: 3,
     width: 10,
     height: 1.25,
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.toastText,
   },
   repeatBottomArrow: {
     position: 'absolute',
@@ -420,7 +423,7 @@ const styles = StyleSheet.create({
     height: 4,
     borderBottomWidth: 1.25,
     borderLeftWidth: 1.25,
-    borderColor: '#ffffff',
+    borderColor: colors.toastText,
     transform: [{ rotate: '45deg' }],
   },
   reminderBell: {
@@ -432,7 +435,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 1.25,
     borderRightWidth: 1.25,
     borderLeftWidth: 1.25,
-    borderColor: '#ffffff',
+    borderColor: colors.toastText,
     borderTopLeftRadius: 5,
     borderTopRightRadius: 5,
   },
@@ -444,7 +447,7 @@ const styles = StyleSheet.create({
     height: 3,
     borderTopWidth: 1.25,
     borderBottomWidth: 1.25,
-    borderColor: '#ffffff',
+    borderColor: colors.toastText,
   },
   backupShaft: {
     position: 'absolute',
@@ -452,7 +455,7 @@ const styles = StyleSheet.create({
     left: 6.25,
     width: 1.5,
     height: 8,
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.toastText,
   },
   backupArrowLeft: {
     position: 'absolute',
@@ -460,7 +463,7 @@ const styles = StyleSheet.create({
     left: 3,
     width: 5,
     height: 1.5,
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.toastText,
     transform: [{ rotate: '45deg' }],
   },
   backupArrowRight: {
@@ -469,7 +472,7 @@ const styles = StyleSheet.create({
     right: 3,
     width: 5,
     height: 1.5,
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.toastText,
     transform: [{ rotate: '-45deg' }],
   },
   backupTray: {
@@ -481,11 +484,11 @@ const styles = StyleSheet.create({
     borderRightWidth: 1.25,
     borderBottomWidth: 1.25,
     borderLeftWidth: 1.25,
-    borderColor: '#ffffff',
+    borderColor: colors.toastText,
   },
   message: {
     flexShrink: 1,
-    color: '#ffffff',
+    color: colors.toastText,
     fontFamily: 'SpaceMono_700Bold',
     fontSize: 11,
     letterSpacing: -0.25,
@@ -496,10 +499,10 @@ const styles = StyleSheet.create({
     marginLeft: 4,
     paddingLeft: 11,
     borderLeftWidth: 1,
-    borderColor: '#5c5c59',
+    borderColor: colors.toastBorder,
   },
   toastActionText: {
-    color: '#ffffff',
+    color: colors.toastText,
     fontFamily: 'SpaceMono_700Bold',
     fontSize: 10,
     textTransform: 'uppercase',

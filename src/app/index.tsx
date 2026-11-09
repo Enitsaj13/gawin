@@ -16,10 +16,13 @@ import { useTodos } from '@/features/todos/todos-context';
 import { Todo } from '@/features/todos/types';
 import { UnfinishedReviewSheet } from '@/features/todos/unfinished-review-sheet';
 import { formatJournalDate, formatWeekday } from '@/lib/date';
+import { ThemeColors, useAppTheme, useThemeStyles } from '@/theme/theme';
 
 type ComposerState = { mode: 'create' } | { mode: 'edit'; todo: Todo } | null;
 
 export default function HomeScreen() {
+  const styles = useThemeStyles(createStyles);
+  const { statusBarStyle } = useAppTheme();
   const feedback = useFeedback();
   const { backupDue } = usePreferences();
   const [composer, setComposer] = useState<ComposerState>(null);
@@ -56,7 +59,7 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView edges={['top', 'bottom']} style={styles.safeArea}>
-      <StatusBar style="dark" />
+      <StatusBar style={statusBarStyle} />
       <View style={styles.page}>
         <ScrollView
           contentContainerStyle={styles.scrollContent}
@@ -207,17 +210,17 @@ export default function HomeScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#fbfbf9',
+    backgroundColor: colors.background,
   },
   page: {
     width: '100%',
     maxWidth: 560,
     flex: 1,
     alignSelf: 'center',
-    backgroundColor: '#fbfbf9',
+    backgroundColor: colors.background,
   },
   scrollContent: {
     paddingBottom: 94,
@@ -243,19 +246,19 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   title: {
-    color: '#111111',
+    color: colors.text,
     fontFamily: 'SpaceMono_700Bold',
     fontSize: 24,
     letterSpacing: -1.3,
   },
   todayDate: {
-    color: '#888781',
+    color: colors.textMuted,
     fontFamily: 'SpaceMono_400Regular',
     fontSize: 10,
     letterSpacing: -0.45,
   },
   weekday: {
-    color: '#85847f',
+    color: colors.textMuted,
     fontFamily: 'SpaceMono_400Regular',
     fontSize: 10,
   },
@@ -264,7 +267,7 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   progress: {
-    color: '#9a9993',
+    color: colors.textFaint,
     fontFamily: 'SpaceMono_400Regular',
     fontSize: 9,
     letterSpacing: -0.3,
@@ -280,15 +283,15 @@ const styles = StyleSheet.create({
     minHeight: 28,
     justifyContent: 'center',
     borderBottomWidth: 1,
-    borderColor: '#2f2f2d',
+    borderColor: colors.textSecondary,
   },
   menuActionText: {
-    color: '#343432',
+    color: colors.textSecondary,
     fontFamily: 'SpaceMono_700Bold',
     fontSize: 9,
   },
   backupDue: {
-    color: '#777671',
+    color: colors.textMuted,
     fontFamily: 'SpaceMono_400Regular',
     fontSize: 8,
     textDecorationLine: 'underline',
@@ -311,7 +314,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 2,
-    backgroundColor: '#111111',
+    backgroundColor: colors.accent,
   },
   floatingButtonPressed: {
     opacity: 0.82,
@@ -330,7 +333,7 @@ const styles = StyleSheet.create({
     right: 0,
     left: 0,
     height: 1.5,
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.accentText,
   },
   plusVertical: {
     position: 'absolute',
@@ -338,6 +341,6 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 8.25,
     width: 1.5,
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.accentText,
   },
 });

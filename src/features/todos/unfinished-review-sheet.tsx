@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useFeedback } from '@/features/preferences/preferences-context';
 import { formatJournalDate } from '@/lib/date';
+import { ThemeColors, useThemeStyles } from '@/theme/theme';
 
 import { Todo } from './types';
 
@@ -20,6 +21,7 @@ export function UnfinishedReviewSheet({
   onMove,
   todos,
 }: UnfinishedReviewSheetProps) {
+  const styles = useThemeStyles(createStyles);
   const insets = useSafeAreaInsets();
   const feedback = useFeedback();
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -179,11 +181,11 @@ export function UnfinishedReviewSheet({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   modalRoot: {
     flex: 1,
     justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0, 0, 0, 0.42)',
+    backgroundColor: colors.scrim,
   },
   sheet: {
     width: '100%',
@@ -191,22 +193,22 @@ const styles = StyleSheet.create({
     maxHeight: '82%',
     alignSelf: 'center',
     borderTopWidth: 1,
-    borderColor: '#111111',
-    backgroundColor: '#fbfbf9',
+    borderColor: colors.accent,
+    backgroundColor: colors.surface,
   },
   content: {
     paddingHorizontal: 24,
     paddingTop: 27,
   },
   eyebrow: {
-    color: '#74736e',
+    color: colors.textMuted,
     fontFamily: 'SpaceMono_400Regular',
     fontSize: 10,
     textTransform: 'uppercase',
   },
   title: {
     marginTop: 5,
-    color: '#111111',
+    color: colors.text,
     fontFamily: 'SpaceMono_700Bold',
     fontSize: 21,
     lineHeight: 28,
@@ -214,7 +216,7 @@ const styles = StyleSheet.create({
   },
   body: {
     marginTop: 9,
-    color: '#74736e',
+    color: colors.textMuted,
     fontFamily: 'SpaceMono_400Regular',
     fontSize: 10,
     lineHeight: 17,
@@ -226,7 +228,7 @@ const styles = StyleSheet.create({
   taskList: {
     paddingHorizontal: 24,
     borderTopWidth: 1,
-    borderColor: '#d1d0cb',
+    borderColor: colors.border,
   },
   taskRow: {
     minHeight: 52,
@@ -234,7 +236,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
     borderBottomWidth: 1,
-    borderColor: '#d1d0cb',
+    borderColor: colors.border,
   },
   checkbox: {
     width: 17,
@@ -242,21 +244,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: '#686863',
+    borderColor: colors.borderStrong,
   },
   checked: {
-    borderColor: '#343432',
-    backgroundColor: '#343432',
+    borderColor: colors.accent,
+    backgroundColor: colors.accent,
   },
   checkmark: {
-    color: '#ffffff',
+    color: colors.accentText,
     fontFamily: 'SpaceMono_700Bold',
     fontSize: 11,
     lineHeight: 13,
   },
   taskTitle: {
     flex: 1,
-    color: '#343432',
+    color: colors.textSecondary,
     fontFamily: 'SpaceMono_400Regular',
     fontSize: 12,
     lineHeight: 18,
@@ -270,10 +272,10 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#111111',
+    backgroundColor: colors.accent,
   },
   primaryButtonText: {
-    color: '#ffffff',
+    color: colors.accentText,
     fontFamily: 'SpaceMono_700Bold',
     fontSize: 11,
   },
@@ -283,10 +285,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: '#111111',
+    borderColor: colors.accent,
   },
   outlineButtonText: {
-    color: '#111111',
+    color: colors.text,
     fontFamily: 'SpaceMono_700Bold',
     fontSize: 11,
   },
@@ -300,7 +302,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   textButtonText: {
-    color: '#555550',
+    color: colors.textSecondary,
     fontFamily: 'SpaceMono_700Bold',
     fontSize: 9,
   },

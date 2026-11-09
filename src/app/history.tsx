@@ -16,8 +16,11 @@ import { AppMenuSheet } from '@/components/app-menu-sheet';
 import { BackButton } from '@/components/back-button';
 import { DayCard } from '@/features/todos/day-card';
 import { useTodos } from '@/features/todos/todos-context';
+import { ThemeColors, useAppTheme, useThemeStyles } from '@/theme/theme';
 
 export default function HistoryScreen() {
+  const styles = useThemeStyles(createStyles);
+  const { colors, statusBarStyle } = useAppTheme();
   const [menuOpen, setMenuOpen] = useState(false);
   const [query, setQuery] = useState('');
   const { getTodosForDate, today, todos, toggleTodo } = useTodos();
@@ -35,7 +38,7 @@ export default function HistoryScreen() {
 
   return (
     <SafeAreaView edges={['top', 'bottom']} style={styles.safeArea}>
-      <StatusBar style="dark" />
+      <StatusBar style={statusBarStyle} />
       <View style={styles.page}>
         <View style={styles.header}>
           <Pressable
@@ -82,9 +85,9 @@ export default function HistoryScreen() {
               maxLength={80}
               onChangeText={setQuery}
               placeholder="Search past tasks"
-              placeholderTextColor="#979691"
+              placeholderTextColor={colors.textMuted}
               returnKeyType="search"
-              selectionColor="#111111"
+              selectionColor={colors.accent}
               style={[styles.searchInput, Platform.OS === 'web' && styles.searchInputWeb]}
               value={query}
             />
@@ -128,17 +131,17 @@ export default function HistoryScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#fbfbf9',
+    backgroundColor: colors.background,
   },
   page: {
     width: '100%',
     maxWidth: 560,
     flex: 1,
     alignSelf: 'center',
-    backgroundColor: '#fbfbf9',
+    backgroundColor: colors.background,
   },
   header: {
     minHeight: 115,
@@ -155,13 +158,13 @@ const styles = StyleSheet.create({
   },
   title: {
     flex: 1,
-    color: '#111111',
+    color: colors.text,
     fontFamily: 'SpaceMono_700Bold',
     fontSize: 22,
     letterSpacing: -1.25,
   },
   dayCount: {
-    color: '#85847f',
+    color: colors.textMuted,
     fontFamily: 'SpaceMono_400Regular',
     fontSize: 9,
   },
@@ -173,10 +176,10 @@ const styles = StyleSheet.create({
     minHeight: 24,
     justifyContent: 'center',
     borderBottomWidth: 1,
-    borderColor: '#2f2f2d',
+    borderColor: colors.textSecondary,
   },
   menuActionText: {
-    color: '#343432',
+    color: colors.textSecondary,
     fontFamily: 'SpaceMono_700Bold',
     fontSize: 9,
   },
@@ -187,8 +190,8 @@ const styles = StyleSheet.create({
   searchInput: {
     minHeight: 42,
     borderBottomWidth: 1,
-    borderColor: '#8d8c87',
-    color: '#242422',
+    borderColor: colors.borderStrong,
+    color: colors.textSecondary,
     fontFamily: 'SpaceMono_400Regular',
     fontSize: 11,
     paddingVertical: 10,
@@ -204,7 +207,7 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     borderTopWidth: StyleSheet.hairlineWidth,
     borderLeftWidth: StyleSheet.hairlineWidth,
-    borderColor: '#d7d7d3',
+    borderColor: colors.border,
   },
   emptyState: {
     flex: 1,
@@ -213,13 +216,13 @@ const styles = StyleSheet.create({
     paddingBottom: 90,
   },
   emptyTitle: {
-    color: '#3c3c39',
+    color: colors.textSecondary,
     fontFamily: 'SpaceMono_700Bold',
     fontSize: 14,
   },
   emptyBody: {
     marginTop: 6,
-    color: '#96958f',
+    color: colors.textMuted,
     fontFamily: 'SpaceMono_400Regular',
     fontSize: 11,
   },

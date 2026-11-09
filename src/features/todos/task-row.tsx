@@ -11,6 +11,7 @@ import {
   useFeedback,
   usePreferences,
 } from '@/features/preferences/preferences-context';
+import { ThemeColors, useThemeStyles } from '@/theme/theme';
 
 import {
   ReorderGestureDetector,
@@ -60,6 +61,7 @@ export function TaskRow({
   repeatDays,
   onToggle,
 }: TaskRowProps) {
+  const styles = useThemeStyles(createStyles);
   const feedback = useFeedback();
   const { preferences } = usePreferences();
   const [actionSheetMode, setActionSheetMode] =
@@ -309,7 +311,7 @@ function formatReminder(value: string) {
     : `${date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}, ${time}`;
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   row: {
     minHeight: 40,
     flexDirection: 'row',
@@ -335,7 +337,7 @@ const styles = StyleSheet.create({
     width: 18,
     height: 18,
     borderWidth: 1,
-    borderColor: '#777772',
+    borderColor: colors.borderStrong,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -344,11 +346,11 @@ const styles = StyleSheet.create({
     height: 15,
   },
   checked: {
-    borderColor: '#343432',
-    backgroundColor: '#343432',
+    borderColor: colors.accent,
+    backgroundColor: colors.accent,
   },
   checkmark: {
-    color: '#ffffff',
+    color: colors.accentText,
     fontFamily: 'SpaceMono_700Bold',
     fontSize: 13,
     lineHeight: 15,
@@ -358,7 +360,7 @@ const styles = StyleSheet.create({
     lineHeight: 12,
   },
   label: {
-    color: '#363634',
+    color: colors.textSecondary,
     fontFamily: 'SpaceMono_400Regular',
     fontSize: 14,
     letterSpacing: -0.35,
@@ -368,12 +370,12 @@ const styles = StyleSheet.create({
     letterSpacing: -0.4,
   },
   completedLabel: {
-    color: '#777671',
+    color: colors.textMuted,
     textDecorationLine: 'line-through',
   },
   reminderLabel: {
     marginTop: 1,
-    color: '#96958f',
+    color: colors.textMuted,
     fontFamily: 'SpaceMono_400Regular',
     fontSize: 8,
   },
@@ -391,7 +393,7 @@ const styles = StyleSheet.create({
   },
   menuText: {
     marginTop: -7,
-    color: '#767570',
+    color: colors.textMuted,
     fontFamily: 'SpaceMono_700Bold',
     fontSize: 13,
     letterSpacing: 1,

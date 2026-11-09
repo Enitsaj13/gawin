@@ -14,6 +14,7 @@ import {
   useFeedback,
   usePreferences,
 } from '@/features/preferences/preferences-context';
+import { ThemeColors, useAppTheme, useThemeStyles } from '@/theme/theme';
 
 type SheetMode =
   | 'actions'
@@ -65,6 +66,8 @@ export function TaskActionsSheet({
   onStopRepeat,
   onToggleDefault,
 }: TaskActionsSheetProps) {
+  const styles = useThemeStyles(createStyles);
+  const { colors } = useAppTheme();
   const insets = useSafeAreaInsets();
   const feedback = useFeedback();
   const { preferences } = usePreferences();
@@ -556,7 +559,7 @@ export function TaskActionsSheet({
                           pressed && styles.pressed,
                         ]}
                       >
-                        <TrashIcon color="#ffffff" />
+                        <TrashIcon color={colors.accentText} />
                         <Text style={styles.confirmDeleteText}>
                           Today & future
                         </Text>
@@ -596,7 +599,7 @@ export function TaskActionsSheet({
                         pressed && styles.pressed,
                       ]}
                     >
-                      <TrashIcon color="#ffffff" />
+                      <TrashIcon color={colors.accentText} />
                       <Text style={styles.confirmDeleteText}>Delete</Text>
                     </Pressable>
                   </View>
@@ -611,6 +614,7 @@ export function TaskActionsSheet({
 }
 
 function ScheduleRow({ label, onPress }: { label: string; onPress: () => void }) {
+  const styles = useThemeStyles(createStyles);
   return (
     <Pressable
       accessibilityLabel={`Repeat ${label.toLowerCase()}`}
@@ -664,7 +668,14 @@ function dayName(day: number) {
   return ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][day];
 }
 
-function PencilIcon({ color = '#242422' }: { color?: string }) {
+function useActionIcon(color?: string) {
+  const styles = useThemeStyles(createStyles);
+  const { colors } = useAppTheme();
+  return { color: color ?? colors.textSecondary, styles };
+}
+
+function PencilIcon({ color: requestedColor }: { color?: string }) {
+  const { color, styles } = useActionIcon(requestedColor);
   return (
     <View
       accessibilityElementsHidden
@@ -677,7 +688,8 @@ function PencilIcon({ color = '#242422' }: { color?: string }) {
   );
 }
 
-function DuplicateIcon({ color = '#242422' }: { color?: string }) {
+function DuplicateIcon({ color: requestedColor }: { color?: string }) {
+  const { color, styles } = useActionIcon(requestedColor);
   return (
     <View
       accessibilityElementsHidden
@@ -690,7 +702,8 @@ function DuplicateIcon({ color = '#242422' }: { color?: string }) {
   );
 }
 
-function ReminderIcon({ color = '#242422' }: { color?: string }) {
+function ReminderIcon({ color: requestedColor }: { color?: string }) {
+  const { color, styles } = useActionIcon(requestedColor);
   return (
     <View
       accessibilityElementsHidden
@@ -703,7 +716,8 @@ function ReminderIcon({ color = '#242422' }: { color?: string }) {
   );
 }
 
-function TrashIcon({ color = '#242422' }: { color?: string }) {
+function TrashIcon({ color: requestedColor }: { color?: string }) {
+  const { color, styles } = useActionIcon(requestedColor);
   return (
     <View
       accessibilityElementsHidden
@@ -720,7 +734,8 @@ function TrashIcon({ color = '#242422' }: { color?: string }) {
   );
 }
 
-function MoveIcon({ color = '#242422' }: { color?: string }) {
+function MoveIcon({ color: requestedColor }: { color?: string }) {
+  const { color, styles } = useActionIcon(requestedColor);
   return (
     <View
       accessibilityElementsHidden
@@ -734,7 +749,8 @@ function MoveIcon({ color = '#242422' }: { color?: string }) {
   );
 }
 
-function RepeatIcon({ color = '#242422' }: { color?: string }) {
+function RepeatIcon({ color: requestedColor }: { color?: string }) {
+  const { color, styles } = useActionIcon(requestedColor);
   return (
     <View
       accessibilityElementsHidden
@@ -749,7 +765,7 @@ function RepeatIcon({ color = '#242422' }: { color?: string }) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   modalRoot: {
     flex: 1,
     justifyContent: 'flex-end',
@@ -760,22 +776,22 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     left: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.42)',
+    backgroundColor: colors.scrim,
   },
   sheet: {
     width: '100%',
     maxWidth: 560,
     alignSelf: 'center',
     borderTopWidth: 1,
-    borderColor: '#111111',
-    backgroundColor: '#fbfbf9',
+    borderColor: colors.accent,
+    backgroundColor: colors.surface,
   },
   sheetContent: {
     paddingHorizontal: 24,
     paddingTop: 26,
   },
   eyebrow: {
-    color: '#74736e',
+    color: colors.textMuted,
     fontFamily: 'SpaceMono_400Regular',
     fontSize: 10,
     textTransform: 'uppercase',
@@ -783,7 +799,7 @@ const styles = StyleSheet.create({
   },
   taskTitle: {
     marginTop: 5,
-    color: '#111111',
+    color: colors.text,
     fontFamily: 'SpaceMono_700Bold',
     fontSize: 20,
     lineHeight: 28,
@@ -792,7 +808,7 @@ const styles = StyleSheet.create({
   actionList: {
     marginTop: 24,
     borderTopWidth: 1,
-    borderColor: '#c9c8c3',
+    borderColor: colors.border,
   },
   actionRow: {
     minHeight: 54,
@@ -800,16 +816,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
     borderBottomWidth: 1,
-    borderColor: '#c9c8c3',
+    borderColor: colors.border,
   },
   actionText: {
-    color: '#242422',
+    color: colors.textSecondary,
     fontFamily: 'SpaceMono_700Bold',
     fontSize: 12,
   },
   actionMeta: {
     marginTop: 1,
-    color: '#8b8a85',
+    color: colors.textMuted,
     fontFamily: 'SpaceMono_400Regular',
     fontSize: 8,
   },
@@ -819,30 +835,30 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginTop: 10,
     borderWidth: 1,
-    borderColor: '#111111',
+    borderColor: colors.accent,
   },
   cancelText: {
-    color: '#111111',
+    color: colors.text,
     fontFamily: 'SpaceMono_700Bold',
     fontSize: 12,
   },
   confirmTitle: {
     marginTop: 5,
-    color: '#111111',
+    color: colors.text,
     fontFamily: 'SpaceMono_700Bold',
     fontSize: 22,
     letterSpacing: -0.9,
   },
   confirmTaskTitle: {
     marginTop: 18,
-    color: '#3f3f3c',
+    color: colors.textSecondary,
     fontFamily: 'SpaceMono_400Regular',
     fontSize: 13,
     lineHeight: 20,
   },
   confirmBody: {
     marginTop: 6,
-    color: '#85847f',
+    color: colors.textMuted,
     fontFamily: 'SpaceMono_400Regular',
     fontSize: 10,
   },
@@ -864,19 +880,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: '#8a8984',
+    borderColor: colors.borderStrong,
   },
   dayButtonSelected: {
-    borderColor: '#111111',
-    backgroundColor: '#111111',
+    borderColor: colors.accent,
+    backgroundColor: colors.accent,
   },
   dayButtonText: {
-    color: '#444441',
+    color: colors.textSecondary,
     fontFamily: 'SpaceMono_700Bold',
     fontSize: 10,
   },
   dayButtonTextSelected: {
-    color: '#ffffff',
+    color: colors.accentText,
   },
   confirmCancel: {
     minHeight: 50,
@@ -884,7 +900,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: '#111111',
+    borderColor: colors.accent,
   },
   confirmDelete: {
     minHeight: 50,
@@ -893,15 +909,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: '#111111',
+    backgroundColor: colors.accent,
   },
   confirmCancelText: {
-    color: '#111111',
+    color: colors.text,
     fontFamily: 'SpaceMono_700Bold',
     fontSize: 12,
   },
   confirmDeleteText: {
-    color: '#ffffff',
+    color: colors.accentText,
     fontFamily: 'SpaceMono_700Bold',
     fontSize: 12,
   },
@@ -948,7 +964,7 @@ const styles = StyleSheet.create({
     width: 9,
     height: 9,
     borderWidth: 1.2,
-    backgroundColor: '#fbfbf9',
+    backgroundColor: colors.surface,
   },
   reminderDome: {
     position: 'absolute',

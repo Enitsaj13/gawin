@@ -7,6 +7,7 @@ import {
 } from 'react-native-gesture-handler';
 
 import { useFeedback } from '@/features/preferences/preferences-context';
+import { ThemeColors, useThemeStyles } from '@/theme/theme';
 
 const DEFAULT_ROW_HEIGHT = 40;
 
@@ -170,6 +171,7 @@ function ReorderableTaskItem<Item extends { id: string }>({
   rowHeight,
   todo,
 }: ReorderableTaskItemProps<Item>) {
+  const styles = useThemeStyles(createStyles);
   const feedback = useFeedback();
   const [translateY] = useState(() => new Animated.Value(0));
   const [suppressPress, setSuppressPress] = useState(false);
@@ -255,7 +257,7 @@ export function ReorderGestureDetector({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   itemShell: {
     position: 'relative',
   },
@@ -265,14 +267,14 @@ const styles = StyleSheet.create({
   },
   item: {
     zIndex: 1,
-    backgroundColor: '#fbfbf9',
+    backgroundColor: colors.background,
   },
   dragging: {
     zIndex: 20,
     elevation: 3,
-    backgroundColor: '#f1f1ee',
+    backgroundColor: colors.surfacePressed,
     opacity: 0.96,
-    shadowColor: '#111111',
+    shadowColor: colors.shadow,
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.14,
     shadowRadius: 8,

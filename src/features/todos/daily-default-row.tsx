@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { ThemeColors, useThemeStyles } from '@/theme/theme';
+
 import {
   ReorderGestureDetector,
   TaskReorderControls,
@@ -25,6 +27,7 @@ export function DailyDefaultRow({
   reorderGesture,
   suppressPress,
 }: DailyDefaultRowProps) {
+  const styles = useThemeStyles(createStyles);
   const [actionsOpen, setActionsOpen] = useState(false);
   const label = (
     <Pressable
@@ -108,7 +111,7 @@ export function DailyDefaultRow({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   row: {
     minHeight: 48,
     flexDirection: 'row',
@@ -126,14 +129,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: '#777772',
+    borderColor: colors.borderStrong,
   },
   checked: {
-    borderColor: '#343432',
-    backgroundColor: '#343432',
+    borderColor: colors.accent,
+    backgroundColor: colors.accent,
   },
   checkmark: {
-    color: '#ffffff',
+    color: colors.accentText,
     fontFamily: 'SpaceMono_700Bold',
     fontSize: 12,
     lineHeight: 14,
@@ -145,14 +148,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   title: {
-    color: '#363634',
+    color: colors.textSecondary,
     fontFamily: 'SpaceMono_400Regular',
     fontSize: 13,
     letterSpacing: -0.3,
   },
   status: {
     marginTop: 1,
-    color: '#96958f',
+    color: colors.textMuted,
     fontFamily: 'SpaceMono_400Regular',
     fontSize: 8,
   },
@@ -163,7 +166,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   menuText: {
-    color: '#777772',
+    color: colors.borderStrong,
     fontFamily: 'SpaceMono_700Bold',
     fontSize: 12,
     letterSpacing: 1.4,

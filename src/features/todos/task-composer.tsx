@@ -12,6 +12,7 @@ import {
 import type { ViewStyle } from 'react-native';
 
 import { formatJournalDate } from '@/lib/date';
+import { ThemeColors, useAppTheme, useThemeStyles } from '@/theme/theme';
 
 type TaskComposerProps = {
   allowSeriesUpdate?: boolean;
@@ -45,6 +46,8 @@ export function TaskComposer({
   onClose,
   onSubmit,
 }: TaskComposerProps) {
+  const styles = useThemeStyles(createStyles);
+  const { colors } = useAppTheme();
   const [title, setTitle] = useState(initialTitle);
   const [updateSeries, setUpdateSeries] = useState(false);
   const [inputFocused, setInputFocused] = useState(false);
@@ -138,10 +141,10 @@ export function TaskComposer({
               onFocus={() => setInputFocused(true)}
               onSubmitEditing={submit}
               placeholder="What needs to be done?"
-              placeholderTextColor="#9c9b96"
+              placeholderTextColor={colors.textMuted}
               returnKeyType="done"
               selectTextOnFocus={Boolean(initialTitle)}
-              selectionColor="#111111"
+              selectionColor={colors.accent}
               style={[
                 styles.input,
                 Platform.OS === 'web' && styles.inputWeb,
@@ -229,34 +232,34 @@ export function TaskComposer({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   keyboardView: {
     flex: 1,
   },
   backdrop: {
     flex: 1,
     justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0, 0, 0, 0.42)',
+    backgroundColor: colors.scrim,
   },
   sheet: {
     width: '100%',
     maxWidth: 560,
     alignSelf: 'center',
-    backgroundColor: '#fbfbf9',
+    backgroundColor: colors.surface,
     paddingHorizontal: 24,
     paddingTop: 28,
     paddingBottom: Platform.OS === 'ios' ? 38 : 26,
     borderTopWidth: 1,
-    borderColor: '#111111',
+    borderColor: colors.accent,
   },
   eyebrow: {
-    color: '#74736e',
+    color: colors.textMuted,
     fontFamily: 'SpaceMono_400Regular',
     fontSize: 11,
   },
   title: {
     marginTop: 4,
-    color: '#111111',
+    color: colors.text,
     fontFamily: 'SpaceMono_700Bold',
     fontSize: 23,
   },
@@ -264,8 +267,8 @@ const styles = StyleSheet.create({
     minHeight: 54,
     marginTop: 24,
     borderBottomWidth: 1,
-    borderColor: '#111111',
-    color: '#1b1b1a',
+    borderColor: colors.accent,
+    color: colors.text,
     fontFamily: 'SpaceMono_400Regular',
     fontSize: 15,
     paddingVertical: 12,
@@ -285,7 +288,7 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   scopeLabel: {
-    color: '#777671',
+    color: colors.textMuted,
     fontFamily: 'SpaceMono_400Regular',
     fontSize: 9,
     textTransform: 'uppercase',
@@ -301,19 +304,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: '#8c8b86',
+    borderColor: colors.borderStrong,
   },
   scopeOptionSelected: {
-    borderColor: '#111111',
-    backgroundColor: '#111111',
+    borderColor: colors.accent,
+    backgroundColor: colors.accent,
   },
   scopeOptionText: {
-    color: '#555550',
+    color: colors.textSecondary,
     fontFamily: 'SpaceMono_700Bold',
     fontSize: 9,
   },
   scopeOptionTextSelected: {
-    color: '#ffffff',
+    color: colors.accentText,
   },
   cancel: {
     minHeight: 50,
@@ -321,25 +324,25 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: '#111111',
+    borderColor: colors.accent,
   },
   add: {
     minHeight: 50,
     flex: 1.4,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#111111',
+    backgroundColor: colors.accent,
   },
   addDisabled: {
-    backgroundColor: '#aaa9a5',
+    backgroundColor: colors.disabled,
   },
   cancelText: {
-    color: '#111111',
+    color: colors.text,
     fontFamily: 'SpaceMono_700Bold',
     fontSize: 12,
   },
   addText: {
-    color: '#ffffff',
+    color: colors.accentText,
     fontFamily: 'SpaceMono_700Bold',
     fontSize: 12,
   },

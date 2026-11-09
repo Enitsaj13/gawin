@@ -15,6 +15,7 @@ import {
   useFeedback,
   usePreferences,
 } from '@/features/preferences/preferences-context';
+import { ThemeColors, useThemeStyles } from '@/theme/theme';
 
 type AppMenuSheetProps = {
   onClose: () => void;
@@ -25,6 +26,7 @@ export function AppMenuSheet({
   onClose,
   pastDateCount = 0,
 }: AppMenuSheetProps) {
+  const styles = useThemeStyles(createStyles);
   const insets = useSafeAreaInsets();
   const feedback = useFeedback();
   const { preferences } = usePreferences();
@@ -191,6 +193,7 @@ export function AppMenuSheet({
 }
 
 function HistoryIcon() {
+  const styles = useThemeStyles(createStyles);
   return (
     <View style={styles.icon}>
       <View style={styles.historyPage} />
@@ -201,6 +204,7 @@ function HistoryIcon() {
 }
 
 function RepeatIcon() {
+  const styles = useThemeStyles(createStyles);
   return (
     <View style={styles.icon}>
       <View style={styles.repeatTopLine} />
@@ -212,6 +216,7 @@ function RepeatIcon() {
 }
 
 function SettingsIcon() {
+  const styles = useThemeStyles(createStyles);
   return (
     <View style={styles.icon}>
       <View style={[styles.settingLine, styles.settingLineTop]} />
@@ -222,7 +227,7 @@ function SettingsIcon() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   modalRoot: {
     flex: 1,
     justifyContent: 'flex-end',
@@ -233,22 +238,22 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     left: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.42)',
+    backgroundColor: colors.scrim,
   },
   sheet: {
     width: '100%',
     maxWidth: 560,
     alignSelf: 'center',
     borderTopWidth: 1,
-    borderColor: '#111111',
-    backgroundColor: '#fbfbf9',
+    borderColor: colors.accent,
+    backgroundColor: colors.surface,
   },
   content: {
     paddingHorizontal: 24,
     paddingTop: 26,
   },
   eyebrow: {
-    color: '#74736e',
+    color: colors.textMuted,
     fontFamily: 'SpaceMono_400Regular',
     fontSize: 10,
     letterSpacing: 0.5,
@@ -256,7 +261,7 @@ const styles = StyleSheet.create({
   },
   title: {
     marginTop: 5,
-    color: '#111111',
+    color: colors.text,
     fontFamily: 'SpaceMono_700Bold',
     fontSize: 21,
     letterSpacing: -0.8,
@@ -264,7 +269,7 @@ const styles = StyleSheet.create({
   actionList: {
     marginTop: 23,
     borderTopWidth: 1,
-    borderColor: '#c9c8c3',
+    borderColor: colors.border,
   },
   actionRow: {
     minHeight: 62,
@@ -272,25 +277,25 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 11,
     borderBottomWidth: 1,
-    borderColor: '#c9c8c3',
+    borderColor: colors.border,
   },
   actionCopy: {
     minWidth: 0,
     flex: 1,
   },
   actionText: {
-    color: '#242422',
+    color: colors.textSecondary,
     fontFamily: 'SpaceMono_700Bold',
     fontSize: 11,
   },
   actionMeta: {
     marginTop: 2,
-    color: '#898883',
+    color: colors.textMuted,
     fontFamily: 'SpaceMono_400Regular',
     fontSize: 8,
   },
   arrow: {
-    color: '#343432',
+    color: colors.textSecondary,
     fontFamily: 'SpaceMono_400Regular',
     fontSize: 14,
   },
@@ -305,13 +310,13 @@ const styles = StyleSheet.create({
     bottom: 1,
     left: 1,
     borderWidth: 1.2,
-    borderColor: '#242422',
+    borderColor: colors.textSecondary,
   },
   historyLine: {
     position: 'absolute',
     left: 4,
     height: 1.2,
-    backgroundColor: '#242422',
+    backgroundColor: colors.textSecondary,
   },
   historyLineTop: {
     top: 5,
@@ -327,7 +332,7 @@ const styles = StyleSheet.create({
     left: 1,
     width: 10,
     height: 1.25,
-    backgroundColor: '#242422',
+    backgroundColor: colors.textSecondary,
   },
   repeatTopArrow: {
     position: 'absolute',
@@ -337,7 +342,7 @@ const styles = StyleSheet.create({
     height: 4,
     borderTopWidth: 1.25,
     borderRightWidth: 1.25,
-    borderColor: '#242422',
+    borderColor: colors.textSecondary,
     transform: [{ rotate: '45deg' }],
   },
   repeatBottomLine: {
@@ -346,7 +351,7 @@ const styles = StyleSheet.create({
     bottom: 3,
     width: 10,
     height: 1.25,
-    backgroundColor: '#242422',
+    backgroundColor: colors.textSecondary,
   },
   repeatBottomArrow: {
     position: 'absolute',
@@ -356,7 +361,7 @@ const styles = StyleSheet.create({
     height: 4,
     borderBottomWidth: 1.25,
     borderLeftWidth: 1.25,
-    borderColor: '#242422',
+    borderColor: colors.textSecondary,
     transform: [{ rotate: '45deg' }],
   },
   settingLine: {
@@ -364,7 +369,7 @@ const styles = StyleSheet.create({
     right: 1,
     left: 1,
     height: 1.25,
-    backgroundColor: '#242422',
+    backgroundColor: colors.textSecondary,
   },
   settingLineTop: {
     top: 4,
@@ -377,8 +382,8 @@ const styles = StyleSheet.create({
     width: 4,
     height: 4,
     borderWidth: 1.2,
-    borderColor: '#242422',
-    backgroundColor: '#fbfbf9',
+    borderColor: colors.textSecondary,
+    backgroundColor: colors.surface,
   },
   settingKnobTop: {
     top: 2.5,
@@ -394,10 +399,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginTop: 10,
     borderWidth: 1,
-    borderColor: '#111111',
+    borderColor: colors.accent,
   },
   cancelText: {
-    color: '#111111',
+    color: colors.text,
     fontFamily: 'SpaceMono_700Bold',
     fontSize: 11,
   },

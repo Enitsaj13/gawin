@@ -10,12 +10,15 @@ import { TaskRow } from '@/features/todos/task-row';
 import { useTodos } from '@/features/todos/todos-context';
 import { Todo } from '@/features/todos/types';
 import { formatJournalDate, formatWeekday, shiftDateKey } from '@/lib/date';
+import { ThemeColors, useAppTheme, useThemeStyles } from '@/theme/theme';
 
 function isDateKey(value: string) {
   return /^\d{4}-\d{2}-\d{2}$/.test(value);
 }
 
 export default function DayScreen() {
+  const styles = useThemeStyles(createStyles);
+  const { statusBarStyle } = useAppTheme();
   const [editingTodo, setEditingTodo] = useState<Todo | null>(null);
   const {
     clearTodoReminder,
@@ -54,7 +57,7 @@ export default function DayScreen() {
 
   return (
     <SafeAreaView edges={['top', 'bottom']} style={styles.safeArea}>
-      <StatusBar style="dark" />
+      <StatusBar style={statusBarStyle} />
       <View style={styles.page}>
         <View style={styles.header}>
           <Pressable
@@ -163,17 +166,17 @@ export default function DayScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#fbfbf9',
+    backgroundColor: colors.background,
   },
   page: {
     width: '100%',
     maxWidth: 560,
     flex: 1,
     alignSelf: 'center',
-    backgroundColor: '#fbfbf9',
+    backgroundColor: colors.background,
   },
   header: {
     minHeight: 115,
@@ -190,13 +193,13 @@ const styles = StyleSheet.create({
   },
   title: {
     flex: 1,
-    color: '#111111',
+    color: colors.text,
     fontFamily: 'SpaceMono_700Bold',
     fontSize: 22,
     letterSpacing: -1.25,
   },
   weekday: {
-    color: '#85847f',
+    color: colors.textMuted,
     fontFamily: 'SpaceMono_400Regular',
     fontSize: 10,
   },
@@ -213,19 +216,19 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   emptyTitle: {
-    color: '#3c3c39',
+    color: colors.textSecondary,
     fontFamily: 'SpaceMono_700Bold',
     fontSize: 14,
   },
   emptyBody: {
     marginTop: 6,
-    color: '#96958f',
+    color: colors.textMuted,
     fontFamily: 'SpaceMono_400Regular',
     fontSize: 11,
   },
   deleteHint: {
     marginTop: 28,
-    color: '#a09f99',
+    color: colors.textFaint,
     fontFamily: 'SpaceMono_400Regular',
     fontSize: 9,
     textAlign: 'center',
@@ -240,7 +243,7 @@ const styles = StyleSheet.create({
   },
   railText: {
     maxWidth: 92,
-    color: '#797873',
+    color: colors.textMuted,
     fontFamily: 'SpaceMono_400Regular',
     fontSize: 9,
   },
@@ -249,7 +252,7 @@ const styles = StyleSheet.create({
     paddingTop: 7,
   },
   activeRailText: {
-    color: '#282826',
+    color: colors.textSecondary,
     fontFamily: 'SpaceMono_700Bold',
     fontSize: 10,
   },
@@ -257,7 +260,7 @@ const styles = StyleSheet.create({
     width: 30,
     height: 2,
     marginTop: 9,
-    backgroundColor: '#2d2d2b',
+    backgroundColor: colors.accent,
   },
   pressed: {
     opacity: 0.45,

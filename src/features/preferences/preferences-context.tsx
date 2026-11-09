@@ -10,11 +10,14 @@ import {
   useState,
 } from 'react';
 
+import type { AppearanceMode } from '@/theme/theme';
+
 const PREFERENCES_STORAGE_KEY = 'gawin.preferences.v1';
 
 export type BackupReminderDays = 0 | 7 | 14 | 30;
 
 type Preferences = {
+  appearanceMode: AppearanceMode;
   backupReminderDays: BackupReminderDays;
   backupReminderStartedAt: string;
   hapticsEnabled: boolean;
@@ -27,6 +30,7 @@ type PreferencesContextValue = {
   preferences: Preferences;
   markBackupExported: () => void;
   setBackupReminderDays: (days: BackupReminderDays) => void;
+  setAppearanceMode: (mode: AppearanceMode) => void;
   setHapticsEnabled: (enabled: boolean) => void;
   setReducedMotion: (enabled: boolean) => void;
 };
@@ -35,6 +39,7 @@ const PreferencesContext = createContext<PreferencesContextValue | null>(null);
 
 function defaultPreferences(): Preferences {
   return {
+    appearanceMode: 'system',
     backupReminderDays: 14,
     backupReminderStartedAt: new Date().toISOString(),
     hapticsEnabled: true,
@@ -49,6 +54,11 @@ function parsePreferences(value: string | null): Preferences {
 
   try {
     const parsed = JSON.parse(value) as Partial<Preferences>;
+    const appearanceMode = ['dark', 'light', 'system'].includes(
+      String(parsed.appearanceMode),
+    )
+      ? (parsed.appearanceMode as AppearanceMode)
+      : defaults.appearanceMode;
     const backupReminderDays = [0, 7, 14, 30].includes(
       Number(parsed.backupReminderDays),
     )
@@ -56,6 +66,7 @@ function parsePreferences(value: string | null): Preferences {
       : defaults.backupReminderDays;
 
     return {
+      appearanceMode,
       backupReminderDays,
       backupReminderStartedAt:
         typeof parsed.backupReminderStartedAt === 'string' &&
@@ -139,6 +150,7 @@ export function PreferencesProvider({ children }: PropsWithChildren) {
         updatePreference('lastBackupAt', new Date().toISOString()),
       setBackupReminderDays: (days) =>
         updatePreference('backupReminderDays', days),
+      setAppearanceMode: (mode) => updatePreference('appearanceMode', mode),
       setHapticsEnabled: (enabled) =>
         updatePreference('hapticsEnabled', enabled),
       setReducedMotion: (enabled) =>

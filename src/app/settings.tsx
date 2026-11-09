@@ -11,6 +11,12 @@ import {
   usePreferences,
 } from '@/features/preferences/preferences-context';
 import { useTodos } from '@/features/todos/todos-context';
+import {
+  AppearanceMode,
+  ThemeColors,
+  useAppTheme,
+  useThemeStyles,
+} from '@/theme/theme';
 
 const REMINDER_OPTIONS: { label: string; value: BackupReminderDays }[] = [
   { label: 'Every 7 days', value: 7 },
@@ -19,11 +25,20 @@ const REMINDER_OPTIONS: { label: string; value: BackupReminderDays }[] = [
   { label: 'Never', value: 0 },
 ];
 
+const APPEARANCE_OPTIONS: { label: string; value: AppearanceMode }[] = [
+  { label: 'System', value: 'system' },
+  { label: 'Light', value: 'light' },
+  { label: 'Dark', value: 'dark' },
+];
+
 export default function SettingsScreen() {
+  const styles = useThemeStyles(createStyles);
+  const { statusBarStyle } = useAppTheme();
   const feedback = useFeedback();
   const { dailyDefaults } = useTodos();
   const {
     preferences,
+    setAppearanceMode,
     setBackupReminderDays,
     setHapticsEnabled,
     setReducedMotion,
@@ -36,7 +51,7 @@ export default function SettingsScreen() {
 
   return (
     <SafeAreaView edges={['top', 'bottom']} style={styles.safeArea}>
-      <StatusBar style="dark" />
+      <StatusBar style={statusBarStyle} />
       <View style={styles.page}>
         <View style={styles.header}>
           <Pressable
@@ -61,25 +76,58 @@ export default function SettingsScreen() {
           contentContainerStyle={styles.content}
           showsVerticalScrollIndicator={false}
         >
-          <Text style={styles.eyebrow}>Daily routines</Text>
-          <Pressable
-            accessibilityLabel={`Manage daily defaults. ${dailyDefaults.length} saved.`}
-            accessibilityRole="button"
-            onPress={() => router.push('/defaults')}
-            style={({ pressed }) => [
-              styles.navigationRow,
-              pressed && styles.pressed,
-            ]}
-          >
-            <View style={styles.navigationCopy}>
-              <Text style={styles.navigationTitle}>Daily defaults</Text>
-              <Text style={styles.navigationBody}>
-                Tasks that arrive fresh in Today each morning.
-              </Text>
-            </View>
-            <Text style={styles.navigationCount}>{dailyDefaults.length}</Text>
-            <Text style={styles.navigationArrow}>→</Text>
-          </Pressable>
+          <Text style={styles.eyebrow}>Appearance</Text>
+          <View accessibilityRole="radiogroup" style={styles.appearanceOptions}>
+            {APPEARANCE_OPTIONS.map((option) => {
+              const selected = preferences.appearanceMode === option.value;
+              return (
+                <Pressable
+                  accessibilityLabel={`${option.label} appearance`}
+                  accessibilityRole="radio"
+                  accessibilityState={{ checked: selected }}
+                  key={option.value}
+                  onPress={() => update(() => setAppearanceMode(option.value))}
+                  style={({ pressed }) => [
+                    styles.appearanceOption,
+                    selected && styles.appearanceOptionSelected,
+                    pressed && styles.pressed,
+                  ]}
+                >
+                  <AppearanceIcon mode={option.value} selected={selected} />
+                  <Text
+                    style={[
+                      styles.appearanceLabel,
+                      selected && styles.appearanceLabelSelected,
+                    ]}
+                  >
+                    {option.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
+          <View style={styles.section}>
+            <Text style={styles.eyebrow}>Daily routines</Text>
+            <Pressable
+              accessibilityLabel={`Manage daily defaults. ${dailyDefaults.length} saved.`}
+              accessibilityRole="button"
+              onPress={() => router.push('/defaults')}
+              style={({ pressed }) => [
+                styles.navigationRow,
+                pressed && styles.pressed,
+              ]}
+            >
+              <View style={styles.navigationCopy}>
+                <Text style={styles.navigationTitle}>Daily defaults</Text>
+                <Text style={styles.navigationBody}>
+                  Tasks that arrive fresh in Today each morning.
+                </Text>
+              </View>
+              <Text style={styles.navigationCount}>{dailyDefaults.length}</Text>
+              <Text style={styles.navigationArrow}>→</Text>
+            </Pressable>
+          </View>
 
           <View style={styles.section}>
             <Text style={styles.eyebrow}>Interaction</Text>
@@ -199,6 +247,7 @@ function SettingToggle({
   label: string;
   onPress: () => void;
 }) {
+  const styles = useThemeStyles(createStyles);
   return (
     <Pressable
       accessibilityRole="switch"
@@ -217,17 +266,73 @@ function SettingToggle({
   );
 }
 
-const styles = StyleSheet.create({
+function AppearanceIcon({
+  mode,
+  selected,
+}: {
+  mode: AppearanceMode;
+  selected: boolean;
+}) {
+  const styles = useThemeStyles(createStyles);
+  if (mode === 'system') {
+    return (
+      <View
+        style={[
+          styles.systemIcon,
+          selected && styles.appearanceIconSelected,
+        ]}
+      >
+        <View
+          style={[
+            styles.systemIconHalf,
+            selected && styles.systemIconHalfSelected,
+          ]}
+        />
+      </View>
+    );
+  }
+
+  if (mode === 'light') {
+    return (
+      <View style={styles.sunIcon}>
+        <View style={[styles.sunRayVertical, selected && styles.sunRaySelected]} />
+        <View style={[styles.sunRayHorizontal, selected && styles.sunRaySelected]} />
+        <View
+          style={[
+            styles.sunCore,
+            selected && styles.appearanceIconSelected,
+            selected && styles.sunCoreSelected,
+          ]}
+        />
+      </View>
+    );
+  }
+
+  return (
+    <Text
+      accessibilityElementsHidden
+      importantForAccessibility="no"
+      style={[
+        styles.moonGlyph,
+        selected && styles.moonGlyphSelected,
+      ]}
+    >
+      ☾
+    </Text>
+  );
+}
+
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#fbfbf9',
+    backgroundColor: colors.background,
   },
   page: {
     width: '100%',
     maxWidth: 560,
     flex: 1,
     alignSelf: 'center',
-    backgroundColor: '#fbfbf9',
+    backgroundColor: colors.background,
   },
   header: {
     minHeight: 115,
@@ -244,13 +349,13 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     flex: 1,
-    color: '#111111',
+    color: colors.text,
     fontFamily: 'SpaceMono_700Bold',
     fontSize: 22,
     letterSpacing: -1.25,
   },
   offlineLabel: {
-    color: '#85847f',
+    color: colors.textMuted,
     fontFamily: 'SpaceMono_400Regular',
     fontSize: 9,
     textTransform: 'uppercase',
@@ -260,7 +365,7 @@ const styles = StyleSheet.create({
     paddingBottom: 42,
   },
   eyebrow: {
-    color: '#74736e',
+    color: colors.textMuted,
     fontFamily: 'SpaceMono_700Bold',
     fontSize: 9,
     letterSpacing: 0.45,
@@ -272,10 +377,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     borderBottomWidth: 1,
-    borderColor: '#d0cfca',
+    borderColor: colors.border,
   },
   settingText: {
-    color: '#2f2f2d',
+    color: colors.textSecondary,
     fontFamily: 'SpaceMono_700Bold',
     fontSize: 11,
   },
@@ -285,22 +390,22 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 3,
     borderWidth: 1,
-    borderColor: '#777671',
+    borderColor: colors.borderStrong,
   },
   toggleEnabled: {
-    borderColor: '#111111',
-    backgroundColor: '#111111',
+    borderColor: colors.accent,
+    backgroundColor: colors.accent,
   },
   toggleKnob: {
     width: 14,
     height: 14,
     borderWidth: 1,
-    borderColor: '#777671',
+    borderColor: colors.borderStrong,
   },
   toggleKnobEnabled: {
     alignSelf: 'flex-end',
-    borderColor: '#ffffff',
-    backgroundColor: '#ffffff',
+    borderColor: colors.accentText,
+    backgroundColor: colors.accentText,
   },
   section: {
     marginTop: 36,
@@ -312,52 +417,52 @@ const styles = StyleSheet.create({
     marginTop: 8,
     borderTopWidth: 1,
     borderBottomWidth: 1,
-    borderColor: '#d0cfca',
+    borderColor: colors.border,
   },
   navigationCopy: {
     minWidth: 0,
     flex: 1,
   },
   navigationTitle: {
-    color: '#2f2f2d',
+    color: colors.textSecondary,
     fontFamily: 'SpaceMono_700Bold',
     fontSize: 11,
   },
   navigationBody: {
     marginTop: 3,
-    color: '#85847f',
+    color: colors.textMuted,
     fontFamily: 'SpaceMono_400Regular',
     fontSize: 8,
   },
   navigationCount: {
     minWidth: 22,
-    color: '#85847f',
+    color: colors.textMuted,
     fontFamily: 'SpaceMono_400Regular',
     fontSize: 9,
     textAlign: 'center',
   },
   navigationArrow: {
-    color: '#343432',
+    color: colors.textSecondary,
     fontFamily: 'SpaceMono_400Regular',
     fontSize: 13,
   },
   sectionBody: {
     marginTop: 8,
-    color: '#777671',
+    color: colors.textMuted,
     fontFamily: 'SpaceMono_400Regular',
     fontSize: 9,
     lineHeight: 16,
   },
   subsectionTitle: {
     marginTop: 22,
-    color: '#3d3d3a',
+    color: colors.textSecondary,
     fontFamily: 'SpaceMono_700Bold',
     fontSize: 10,
   },
   optionList: {
     marginTop: 14,
     borderTopWidth: 1,
-    borderColor: '#d0cfca',
+    borderColor: colors.border,
   },
   optionRow: {
     minHeight: 50,
@@ -365,10 +470,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     borderBottomWidth: 1,
-    borderColor: '#d0cfca',
+    borderColor: colors.border,
   },
   optionText: {
-    color: '#3d3d3a',
+    color: colors.textSecondary,
     fontFamily: 'SpaceMono_400Regular',
     fontSize: 10,
   },
@@ -378,20 +483,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: '#777671',
+    borderColor: colors.borderStrong,
   },
   radioSelected: {
-    borderColor: '#111111',
+    borderColor: colors.accent,
   },
   radioDot: {
     width: 7,
     height: 7,
-    backgroundColor: '#111111',
+    backgroundColor: colors.accent,
   },
   aboutList: {
     marginTop: 8,
     borderTopWidth: 1,
-    borderColor: '#d0cfca',
+    borderColor: colors.border,
   },
   aboutRow: {
     minHeight: 48,
@@ -399,19 +504,106 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     borderBottomWidth: 1,
-    borderColor: '#d0cfca',
+    borderColor: colors.border,
   },
   aboutLabel: {
-    color: '#3d3d3a',
+    color: colors.textSecondary,
     fontFamily: 'SpaceMono_700Bold',
     fontSize: 10,
   },
   aboutValue: {
-    color: '#85847f',
+    color: colors.textMuted,
     fontFamily: 'SpaceMono_400Regular',
     fontSize: 9,
   },
   pressed: {
     opacity: 0.5,
+  },
+  appearanceOptions: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 12,
+  },
+  appearanceOption: {
+    minHeight: 58,
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  appearanceOptionSelected: {
+    borderColor: colors.accent,
+    backgroundColor: colors.accent,
+  },
+  appearanceLabel: {
+    color: colors.textSecondary,
+    fontFamily: 'SpaceMono_700Bold',
+    fontSize: 9,
+  },
+  appearanceLabelSelected: {
+    color: colors.accentText,
+  },
+  appearanceIconSelected: {
+    borderColor: colors.accentText,
+  },
+  systemIcon: {
+    width: 14,
+    height: 14,
+    overflow: 'hidden',
+    borderWidth: 1.2,
+    borderColor: colors.textSecondary,
+  },
+  systemIconHalf: {
+    width: 6,
+    height: 12,
+    backgroundColor: colors.textSecondary,
+  },
+  systemIconHalfSelected: {
+    backgroundColor: colors.accentText,
+  },
+  sunIcon: {
+    width: 16,
+    height: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sunCore: {
+    width: 7,
+    height: 7,
+    borderWidth: 1.2,
+    borderColor: colors.textSecondary,
+    backgroundColor: colors.background,
+  },
+  sunCoreSelected: {
+    backgroundColor: colors.accent,
+  },
+  sunRayVertical: {
+    position: 'absolute',
+    width: 1.2,
+    height: 16,
+    backgroundColor: colors.textSecondary,
+  },
+  sunRayHorizontal: {
+    position: 'absolute',
+    width: 16,
+    height: 1.2,
+    backgroundColor: colors.textSecondary,
+  },
+  sunRaySelected: {
+    backgroundColor: colors.accentText,
+  },
+  moonGlyph: {
+    width: 18,
+    height: 18,
+    color: colors.textSecondary,
+    fontFamily: 'SpaceMono_400Regular',
+    fontSize: 19,
+    lineHeight: 19,
+    textAlign: 'center',
+  },
+  moonGlyphSelected: {
+    color: colors.accentText,
   },
 });

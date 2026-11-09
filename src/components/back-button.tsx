@@ -1,8 +1,14 @@
 import { Platform, StyleSheet, Text } from 'react-native';
 
+import { useAppTheme } from '@/theme/theme';
+
 export function BackButton() {
+  const { colors } = useAppTheme();
   return (
-    <Text pointerEvents="none" style={styles.chevron}>
+    <Text
+      pointerEvents="none"
+      style={[styles.chevron, { color: colors.text }]}
+    >
       ‹
     </Text>
   );
@@ -10,7 +16,6 @@ export function BackButton() {
 
 const styles = StyleSheet.create({
   chevron: {
-    color: '#181817',
     fontFamily: 'SpaceMono_400Regular',
     fontSize: 42,
     lineHeight: 44,

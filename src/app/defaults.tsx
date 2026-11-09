@@ -11,6 +11,7 @@ import { ReorderableTaskList } from '@/features/todos/reorderable-task-list';
 import { TaskComposer } from '@/features/todos/task-composer';
 import { useTodos } from '@/features/todos/todos-context';
 import { RepeatRule } from '@/features/todos/types';
+import { ThemeColors, useAppTheme, useThemeStyles } from '@/theme/theme';
 
 type ComposerState =
   | { mode: 'create' }
@@ -18,6 +19,8 @@ type ComposerState =
   | null;
 
 export default function DailyDefaultsScreen() {
+  const styles = useThemeStyles(createStyles);
+  const { statusBarStyle } = useAppTheme();
   const feedback = useFeedback();
   const [composer, setComposer] = useState<ComposerState>(null);
   const [isReordering, setIsReordering] = useState(false);
@@ -33,7 +36,7 @@ export default function DailyDefaultsScreen() {
 
   return (
     <SafeAreaView edges={['top', 'bottom']} style={styles.safeArea}>
-      <StatusBar style="dark" />
+      <StatusBar style={statusBarStyle} />
       <View style={styles.page}>
         <View style={styles.header}>
           <Pressable
@@ -143,17 +146,17 @@ export default function DailyDefaultsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#fbfbf9',
+    backgroundColor: colors.background,
   },
   page: {
     width: '100%',
     maxWidth: 560,
     flex: 1,
     alignSelf: 'center',
-    backgroundColor: '#fbfbf9',
+    backgroundColor: colors.background,
   },
   header: {
     minHeight: 115,
@@ -170,13 +173,13 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     flex: 1,
-    color: '#111111',
+    color: colors.text,
     fontFamily: 'SpaceMono_700Bold',
     fontSize: 20,
     letterSpacing: -1.1,
   },
   count: {
-    color: '#85847f',
+    color: colors.textMuted,
     fontFamily: 'SpaceMono_400Regular',
     fontSize: 10,
   },
@@ -187,7 +190,7 @@ const styles = StyleSheet.create({
     paddingBottom: 100,
   },
   title: {
-    color: '#111111',
+    color: colors.text,
     fontFamily: 'SpaceMono_700Bold',
     fontSize: 24,
     letterSpacing: -1.15,
@@ -195,7 +198,7 @@ const styles = StyleSheet.create({
   intro: {
     maxWidth: 430,
     marginTop: 9,
-    color: '#676661',
+    color: colors.textSecondary,
     fontFamily: 'SpaceMono_400Regular',
     fontSize: 10,
     lineHeight: 17,
@@ -204,13 +207,13 @@ const styles = StyleSheet.create({
     marginTop: 30,
     borderTopWidth: 1,
     borderBottomWidth: 1,
-    borderColor: '#d0cfca',
+    borderColor: colors.border,
     paddingVertical: 5,
   },
   dragHint: {
     marginTop: 14,
     marginBottom: 8,
-    color: '#9a9993',
+    color: colors.textFaint,
     fontFamily: 'SpaceMono_400Regular',
     fontSize: 8,
     textAlign: 'center',
@@ -221,13 +224,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   emptyTitle: {
-    color: '#3c3c39',
+    color: colors.textSecondary,
     fontFamily: 'SpaceMono_700Bold',
     fontSize: 13,
   },
   emptyBody: {
     marginTop: 6,
-    color: '#96958f',
+    color: colors.textMuted,
     fontFamily: 'SpaceMono_400Regular',
     fontSize: 9,
   },
@@ -243,7 +246,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 2,
-    backgroundColor: '#111111',
+    backgroundColor: colors.accent,
   },
   addButtonPressed: {
     opacity: 0.82,
@@ -259,7 +262,7 @@ const styles = StyleSheet.create({
     right: 0,
     left: 0,
     height: 1.5,
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.accentText,
   },
   plusVertical: {
     position: 'absolute',
@@ -267,7 +270,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 8.25,
     width: 1.5,
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.accentText,
   },
   pressed: {
     opacity: 0.48,

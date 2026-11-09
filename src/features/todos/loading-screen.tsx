@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, StyleSheet, View } from 'react-native';
 
 import { usePreferences } from '@/features/preferences/preferences-context';
+import { useAppTheme } from '@/theme/theme';
 
 type LoadingScreenProps = {
   ready: boolean;
@@ -10,6 +11,7 @@ type LoadingScreenProps = {
 
 export function LoadingScreen({ ready, onFinished }: LoadingScreenProps) {
   const { preferences } = usePreferences();
+  const { colors } = useAppTheme();
   const [minimumElapsed, setMinimumElapsed] = useState(false);
   const [contentOpacity] = useState(() => new Animated.Value(1));
   const [fillScale] = useState(() => new Animated.Value(0));
@@ -107,12 +109,13 @@ export function LoadingScreen({ ready, onFinished }: LoadingScreenProps) {
   ]);
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <Animated.View
         accessibilityLabel="Loading tasks"
         accessibilityRole="progressbar"
         style={[
           styles.icon,
+          { borderColor: colors.accent },
           {
             opacity: Animated.multiply(contentOpacity, iconOpacity),
             transform: [{ scale: iconScale }],
@@ -120,9 +123,20 @@ export function LoadingScreen({ ready, onFinished }: LoadingScreenProps) {
         ]}
       >
         <Animated.View
-          style={[styles.fill, { transform: [{ scale: fillScale }] }]}
+          style={[
+            styles.fill,
+            {
+              backgroundColor: colors.accent,
+              transform: [{ scale: fillScale }],
+            },
+          ]}
         />
-        <Animated.View style={[styles.check, { opacity: checkOpacity }]} />
+        <Animated.View
+          style={[
+            styles.check,
+            { borderColor: colors.accentText, opacity: checkOpacity },
+          ]}
+        />
       </Animated.View>
     </View>
   );
@@ -133,7 +147,6 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#fbfbf9',
   },
   icon: {
     width: 44,
@@ -141,7 +154,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1.5,
-    borderColor: '#181817',
   },
   fill: {
     position: 'absolute',
@@ -149,7 +161,6 @@ const styles = StyleSheet.create({
     right: -1.5,
     bottom: -1.5,
     left: -1.5,
-    backgroundColor: '#181817',
   },
   check: {
     width: 10,
@@ -157,7 +168,6 @@ const styles = StyleSheet.create({
     marginTop: -4,
     borderRightWidth: 2,
     borderBottomWidth: 2,
-    borderColor: '#ffffff',
     transform: [{ rotate: '45deg' }],
   },
 });

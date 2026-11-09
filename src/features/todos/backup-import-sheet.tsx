@@ -14,6 +14,7 @@ import {
   useFeedback,
   usePreferences,
 } from '@/features/preferences/preferences-context';
+import { ThemeColors, useAppTheme, useThemeStyles } from '@/theme/theme';
 
 import { TodoBackup } from './backup';
 
@@ -32,6 +33,8 @@ export function BackupImportSheet({
   onMerge,
   onReplace,
 }: BackupImportSheetProps) {
+  const styles = useThemeStyles(createStyles);
+  const { colors } = useAppTheme();
   const insets = useSafeAreaInsets();
   const feedback = useFeedback();
   const { preferences } = usePreferences();
@@ -149,7 +152,7 @@ export function BackupImportSheet({
                       pressed && styles.pressed,
                     ]}
                   >
-                    <ReplaceIcon color="#ffffff" />
+                    <ReplaceIcon color={colors.accentText} />
                     <Text style={styles.confirmReplaceText}>Replace</Text>
                   </Pressable>
                 </View>
@@ -195,7 +198,7 @@ export function BackupImportSheet({
                     pressed && styles.pressed,
                   ]}
                 >
-                  <MergeIcon color="#ffffff" />
+                  <MergeIcon color={colors.accentText} />
                   <Text style={styles.mergeText}>Merge backup</Text>
                 </Pressable>
                 <Pressable
@@ -240,28 +243,34 @@ function formatExportDate(value: string) {
   });
 }
 
-function MergeIcon({ color = '#242422' }: { color?: string }) {
+function MergeIcon({ color }: { color?: string }) {
+  const styles = useThemeStyles(createStyles);
+  const { colors } = useAppTheme();
+  const iconColor = color ?? colors.textSecondary;
   return (
     <View style={styles.icon}>
-      <View style={[styles.mergeTop, { backgroundColor: color }]} />
-      <View style={[styles.mergeBottom, { backgroundColor: color }]} />
-      <View style={[styles.mergeStem, { backgroundColor: color }]} />
+      <View style={[styles.mergeTop, { backgroundColor: iconColor }]} />
+      <View style={[styles.mergeBottom, { backgroundColor: iconColor }]} />
+      <View style={[styles.mergeStem, { backgroundColor: iconColor }]} />
     </View>
   );
 }
 
-function ReplaceIcon({ color = '#242422' }: { color?: string }) {
+function ReplaceIcon({ color }: { color?: string }) {
+  const styles = useThemeStyles(createStyles);
+  const { colors } = useAppTheme();
+  const iconColor = color ?? colors.textSecondary;
   return (
     <View style={styles.icon}>
-      <View style={[styles.replaceTop, { backgroundColor: color }]} />
-      <View style={[styles.replaceTopArrow, { borderColor: color }]} />
-      <View style={[styles.replaceBottom, { backgroundColor: color }]} />
-      <View style={[styles.replaceBottomArrow, { borderColor: color }]} />
+      <View style={[styles.replaceTop, { backgroundColor: iconColor }]} />
+      <View style={[styles.replaceTopArrow, { borderColor: iconColor }]} />
+      <View style={[styles.replaceBottom, { backgroundColor: iconColor }]} />
+      <View style={[styles.replaceBottomArrow, { borderColor: iconColor }]} />
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   modalRoot: {
     flex: 1,
     justifyContent: 'flex-end',
@@ -272,22 +281,22 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     left: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.42)',
+    backgroundColor: colors.scrim,
   },
   sheet: {
     width: '100%',
     maxWidth: 560,
     alignSelf: 'center',
     borderTopWidth: 1,
-    borderColor: '#111111',
-    backgroundColor: '#fbfbf9',
+    borderColor: colors.accent,
+    backgroundColor: colors.surface,
   },
   content: {
     paddingHorizontal: 24,
     paddingTop: 26,
   },
   eyebrow: {
-    color: '#74736e',
+    color: colors.textMuted,
     fontFamily: 'SpaceMono_400Regular',
     fontSize: 10,
     textTransform: 'uppercase',
@@ -295,14 +304,14 @@ const styles = StyleSheet.create({
   },
   title: {
     marginTop: 5,
-    color: '#111111',
+    color: colors.text,
     fontFamily: 'SpaceMono_700Bold',
     fontSize: 22,
     letterSpacing: -0.9,
   },
   fileName: {
     marginTop: 10,
-    color: '#777671',
+    color: colors.textMuted,
     fontFamily: 'SpaceMono_400Regular',
     fontSize: 10,
   },
@@ -313,7 +322,7 @@ const styles = StyleSheet.create({
     marginTop: 22,
     borderTopWidth: 1,
     borderBottomWidth: 1,
-    borderColor: '#c9c8c3',
+    borderColor: colors.border,
   },
   summaryItem: {
     flex: 1,
@@ -323,16 +332,16 @@ const styles = StyleSheet.create({
   summaryDivider: {
     width: 1,
     height: 30,
-    backgroundColor: '#c9c8c3',
+    backgroundColor: colors.border,
   },
   summaryValue: {
-    color: '#111111',
+    color: colors.text,
     fontFamily: 'SpaceMono_700Bold',
     fontSize: 17,
   },
   summaryLabel: {
     marginTop: 2,
-    color: '#85847f',
+    color: colors.textMuted,
     fontFamily: 'SpaceMono_400Regular',
     fontSize: 9,
     textTransform: 'uppercase',
@@ -340,13 +349,13 @@ const styles = StyleSheet.create({
   },
   exportedAt: {
     marginTop: 14,
-    color: '#74736e',
+    color: colors.textMuted,
     fontFamily: 'SpaceMono_400Regular',
     fontSize: 9,
   },
   body: {
     marginTop: 8,
-    color: '#5e5d59',
+    color: colors.textSecondary,
     fontFamily: 'SpaceMono_400Regular',
     fontSize: 10,
     lineHeight: 16,
@@ -358,10 +367,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 9,
     marginTop: 22,
-    backgroundColor: '#111111',
+    backgroundColor: colors.accent,
   },
   mergeText: {
-    color: '#ffffff',
+    color: colors.accentText,
     fontFamily: 'SpaceMono_700Bold',
     fontSize: 12,
   },
@@ -373,10 +382,10 @@ const styles = StyleSheet.create({
     gap: 9,
     marginTop: 10,
     borderWidth: 1,
-    borderColor: '#111111',
+    borderColor: colors.accent,
   },
   replaceText: {
-    color: '#111111',
+    color: colors.text,
     fontFamily: 'SpaceMono_700Bold',
     fontSize: 12,
   },
@@ -387,7 +396,7 @@ const styles = StyleSheet.create({
     marginTop: 5,
   },
   cancelText: {
-    color: '#6f6e69',
+    color: colors.textMuted,
     fontFamily: 'SpaceMono_700Bold',
     fontSize: 11,
   },
@@ -402,7 +411,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: '#111111',
+    borderColor: colors.accent,
   },
   confirmReplace: {
     minHeight: 50,
@@ -411,15 +420,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: '#111111',
+    backgroundColor: colors.accent,
   },
   confirmCancelText: {
-    color: '#111111',
+    color: colors.text,
     fontFamily: 'SpaceMono_700Bold',
     fontSize: 12,
   },
   confirmReplaceText: {
-    color: '#ffffff',
+    color: colors.accentText,
     fontFamily: 'SpaceMono_700Bold',
     fontSize: 12,
   },

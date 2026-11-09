@@ -26,6 +26,7 @@ import {
 } from '@/features/todos/backup-file';
 import { useTodos } from '@/features/todos/todos-context';
 import { todayKey } from '@/lib/date';
+import { ThemeColors, useAppTheme, useThemeStyles } from '@/theme/theme';
 
 const MAX_BACKUP_FILE_SIZE = 5 * 1024 * 1024;
 
@@ -35,6 +36,8 @@ type SelectedBackup = {
 };
 
 export default function BackupScreen() {
+  const styles = useThemeStyles(createStyles);
+  const { statusBarStyle } = useAppTheme();
   const [busyAction, setBusyAction] = useState<'export' | 'import' | null>(
     null,
   );
@@ -96,7 +99,7 @@ export default function BackupScreen() {
 
   return (
     <SafeAreaView edges={['top', 'bottom']} style={styles.safeArea}>
-      <StatusBar style="dark" />
+      <StatusBar style={statusBarStyle} />
       <View style={styles.page}>
         <View style={styles.header}>
           <Pressable
@@ -240,6 +243,7 @@ function formatBackupDate(value: string) {
 }
 
 function ExportIcon() {
+  const styles = useThemeStyles(createStyles);
   return (
     <View style={styles.icon}>
       <View style={styles.exportShaft} />
@@ -251,6 +255,7 @@ function ExportIcon() {
 }
 
 function ImportIcon() {
+  const styles = useThemeStyles(createStyles);
   return (
     <View style={styles.icon}>
       <View style={styles.importShaft} />
@@ -261,17 +266,17 @@ function ImportIcon() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#fbfbf9',
+    backgroundColor: colors.background,
   },
   page: {
     width: '100%',
     maxWidth: 560,
     flex: 1,
     alignSelf: 'center',
-    backgroundColor: '#fbfbf9',
+    backgroundColor: colors.background,
   },
   header: {
     minHeight: 115,
@@ -288,13 +293,13 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     flex: 1,
-    color: '#111111',
+    color: colors.text,
     fontFamily: 'SpaceMono_700Bold',
     fontSize: 20,
     letterSpacing: -1.1,
   },
   offlineLabel: {
-    color: '#85847f',
+    color: colors.textMuted,
     fontFamily: 'SpaceMono_400Regular',
     fontSize: 9,
     textTransform: 'uppercase',
@@ -306,7 +311,7 @@ const styles = StyleSheet.create({
     paddingBottom: 42,
   },
   title: {
-    color: '#111111',
+    color: colors.text,
     fontFamily: 'SpaceMono_700Bold',
     fontSize: 25,
     letterSpacing: -1.2,
@@ -314,19 +319,19 @@ const styles = StyleSheet.create({
   intro: {
     maxWidth: 430,
     marginTop: 9,
-    color: '#676661',
+    color: colors.textSecondary,
     fontFamily: 'SpaceMono_400Regular',
     fontSize: 11,
     lineHeight: 18,
   },
   backupStatus: {
     marginTop: 11,
-    color: '#8a8984',
+    color: colors.textMuted,
     fontFamily: 'SpaceMono_400Regular',
     fontSize: 9,
   },
   backupDue: {
-    color: '#343432',
+    color: colors.textSecondary,
     fontFamily: 'SpaceMono_700Bold',
   },
   deviceSummary: {
@@ -336,7 +341,7 @@ const styles = StyleSheet.create({
     marginTop: 28,
     borderTopWidth: 1,
     borderBottomWidth: 1,
-    borderColor: '#d0cfca',
+    borderColor: colors.border,
   },
   summaryItem: {
     flex: 1,
@@ -345,16 +350,16 @@ const styles = StyleSheet.create({
   summaryDivider: {
     width: 1,
     height: 32,
-    backgroundColor: '#d0cfca',
+    backgroundColor: colors.border,
   },
   summaryValue: {
-    color: '#111111',
+    color: colors.text,
     fontFamily: 'SpaceMono_700Bold',
     fontSize: 18,
   },
   summaryLabel: {
     marginTop: 2,
-    color: '#85847f',
+    color: colors.textMuted,
     fontFamily: 'SpaceMono_400Regular',
     fontSize: 9,
     textTransform: 'uppercase',
@@ -364,7 +369,7 @@ const styles = StyleSheet.create({
     marginTop: 32,
   },
   eyebrow: {
-    color: '#85847f',
+    color: colors.textMuted,
     fontFamily: 'SpaceMono_400Regular',
     fontSize: 9,
     textTransform: 'uppercase',
@@ -372,14 +377,14 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     marginTop: 5,
-    color: '#242422',
+    color: colors.textSecondary,
     fontFamily: 'SpaceMono_700Bold',
     fontSize: 15,
     letterSpacing: -0.45,
   },
   sectionBody: {
     marginTop: 6,
-    color: '#777671',
+    color: colors.textMuted,
     fontFamily: 'SpaceMono_400Regular',
     fontSize: 10,
     lineHeight: 16,
@@ -391,10 +396,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 9,
     marginTop: 16,
-    backgroundColor: '#111111',
+    backgroundColor: colors.accent,
   },
   primaryButtonText: {
-    color: '#ffffff',
+    color: colors.accentText,
     fontFamily: 'SpaceMono_700Bold',
     fontSize: 12,
   },
@@ -406,10 +411,10 @@ const styles = StyleSheet.create({
     gap: 9,
     marginTop: 16,
     borderWidth: 1,
-    borderColor: '#111111',
+    borderColor: colors.accent,
   },
   secondaryButtonText: {
-    color: '#111111',
+    color: colors.text,
     fontFamily: 'SpaceMono_700Bold',
     fontSize: 12,
   },
@@ -424,23 +429,23 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderTopWidth: 1,
     borderBottomWidth: 1,
-    borderColor: '#111111',
+    borderColor: colors.accent,
   },
   errorTitle: {
-    color: '#222220',
+    color: colors.textSecondary,
     fontFamily: 'SpaceMono_700Bold',
     fontSize: 11,
   },
   errorBody: {
     marginTop: 4,
-    color: '#74736e',
+    color: colors.textMuted,
     fontFamily: 'SpaceMono_400Regular',
     fontSize: 9,
     lineHeight: 15,
   },
   privacyNote: {
     marginTop: 30,
-    color: '#9a9993',
+    color: colors.textFaint,
     fontFamily: 'SpaceMono_400Regular',
     fontSize: 9,
     lineHeight: 15,
@@ -455,7 +460,7 @@ const styles = StyleSheet.create({
     left: 6.25,
     width: 1.5,
     height: 9,
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.accentText,
   },
   exportArrowLeft: {
     position: 'absolute',
@@ -463,7 +468,7 @@ const styles = StyleSheet.create({
     left: 3,
     width: 5,
     height: 1.5,
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.accentText,
     transform: [{ rotate: '-45deg' }],
   },
   exportArrowRight: {
@@ -472,7 +477,7 @@ const styles = StyleSheet.create({
     right: 3,
     width: 5,
     height: 1.5,
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.accentText,
     transform: [{ rotate: '45deg' }],
   },
   exportTray: {
@@ -484,7 +489,7 @@ const styles = StyleSheet.create({
     borderRightWidth: 1.25,
     borderBottomWidth: 1.25,
     borderLeftWidth: 1.25,
-    borderColor: '#ffffff',
+    borderColor: colors.accentText,
   },
   importShaft: {
     position: 'absolute',
@@ -492,7 +497,7 @@ const styles = StyleSheet.create({
     left: 6.25,
     width: 1.5,
     height: 9,
-    backgroundColor: '#111111',
+    backgroundColor: colors.accent,
   },
   importArrowLeft: {
     position: 'absolute',
@@ -500,7 +505,7 @@ const styles = StyleSheet.create({
     left: 3,
     width: 5,
     height: 1.5,
-    backgroundColor: '#111111',
+    backgroundColor: colors.accent,
     transform: [{ rotate: '45deg' }],
   },
   importArrowRight: {
@@ -509,7 +514,7 @@ const styles = StyleSheet.create({
     right: 3,
     width: 5,
     height: 1.5,
-    backgroundColor: '#111111',
+    backgroundColor: colors.accent,
     transform: [{ rotate: '-45deg' }],
   },
   importTray: {
@@ -521,6 +526,6 @@ const styles = StyleSheet.create({
     borderRightWidth: 1.25,
     borderBottomWidth: 1.25,
     borderLeftWidth: 1.25,
-    borderColor: '#111111',
+    borderColor: colors.accent,
   },
 });
