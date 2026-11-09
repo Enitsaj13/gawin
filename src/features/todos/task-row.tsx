@@ -38,6 +38,7 @@ type TaskRowProps = Partial<TaskReorderControls> & {
   onStopRepeat?: (id: string) => void;
   repeatDays?: number[] | null;
   onToggle: (id: string) => void;
+  onCompleteAll?: () => void;
 };
 
 export function TaskRow({
@@ -60,6 +61,7 @@ export function TaskRow({
   onStopRepeat,
   repeatDays,
   onToggle,
+  onCompleteAll,
 }: TaskRowProps) {
   const styles = useThemeStyles(createStyles);
   const feedback = useFeedback();
@@ -67,6 +69,7 @@ export function TaskRow({
   const [actionSheetMode, setActionSheetMode] =
     useState<ActionSheetMode>(null);
   const [checkboxScale] = useState(() => new Animated.Value(1));
+  const [celebrationProgress] = useState(() => new Animated.Value(0));
   const [labelOpacity] = useState(
     () => new Animated.Value(todo.completed ? 0.52 : 1),
   );
@@ -111,6 +114,7 @@ export function TaskRow({
       labelOpacity.setValue(willComplete ? 0.52 : 1);
       feedback.selection();
       onToggle(todo.id);
+      if (willComplete) onCompleteAll?.();
       return;
     }
 
@@ -129,6 +133,25 @@ export function TaskRow({
         useNativeDriver: true,
       }),
     ]).start();
+
+    if (willComplete && onCompleteAll) {
+      celebrationProgress.stopAnimation();
+      celebrationProgress.setValue(0);
+      Animated.sequence([
+        Animated.timing(celebrationProgress, {
+          duration: 120,
+          toValue: 1,
+          useNativeDriver: true,
+        }),
+        Animated.delay(430),
+        Animated.timing(celebrationProgress, {
+          duration: 180,
+          toValue: 0,
+          useNativeDriver: true,
+        }),
+      ]).start();
+      onCompleteAll();
+    }
 
     feedback.selection();
     onToggle(todo.id);
@@ -211,6 +234,30 @@ export function TaskRow({
               { transform: [{ scale: checkboxScale }] },
             ]}
           >
+            {onCompleteAll ? (
+              <Animated.View
+                pointerEvents="none"
+                style={[
+                  styles.celebrationLines,
+                  {
+                    opacity: celebrationProgress,
+                    transform: [
+                      {
+                        scale: celebrationProgress.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [0.65, 1],
+                        }),
+                      },
+                    ],
+                  },
+                ]}
+              >
+                <View style={[styles.celebrationLine, styles.celebrationTop]} />
+                <View style={[styles.celebrationLine, styles.celebrationRight]} />
+                <View style={[styles.celebrationLine, styles.celebrationBottom]} />
+                <View style={[styles.celebrationLine, styles.celebrationLeft]} />
+              </Animated.View>
+            ) : null}
             {todo.completed ? (
               <Text
                 style={[styles.checkmark, compact && styles.compactCheckmark]}
@@ -344,6 +391,37 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   compactCheckbox: {
     width: 15,
     height: 15,
+  },
+  celebrationLines: {
+    position: 'absolute',
+    top: -5,
+    right: -5,
+    bottom: -5,
+    left: -5,
+  },
+  celebrationLine: {
+    position: 'absolute',
+    width: 1.25,
+    height: 4,
+    backgroundColor: colors.textSecondary,
+  },
+  celebrationTop: {
+    top: 0,
+    left: '50%',
+  },
+  celebrationRight: {
+    top: '50%',
+    right: 0,
+    transform: [{ rotate: '90deg' }],
+  },
+  celebrationBottom: {
+    bottom: 0,
+    left: '50%',
+  },
+  celebrationLeft: {
+    top: '50%',
+    left: 0,
+    transform: [{ rotate: '90deg' }],
   },
   checked: {
     borderColor: colors.accent,

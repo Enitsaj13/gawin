@@ -20,6 +20,7 @@ const TOAST_GAP = 12;
 
 type ToastAction =
   | 'backup'
+  | 'complete'
   | 'create'
   | 'delete'
   | 'edit'
@@ -52,6 +53,19 @@ const ToastContext = createContext<ToastContextValue | null>(null);
 
 function ToastActionIcon({ action }: { action: ToastAction }) {
   const styles = useThemeStyles(createStyles);
+  if (action === 'complete') {
+    return (
+      <View style={styles.iconFrame}>
+        <View style={[styles.completeRay, styles.completeRayTop]} />
+        <View style={[styles.completeRay, styles.completeRayRight]} />
+        <View style={[styles.completeRay, styles.completeRayBottom]} />
+        <View style={[styles.completeRay, styles.completeRayLeft]} />
+        <View style={[styles.completeRay, styles.completeRayDiagonalA]} />
+        <View style={[styles.completeRay, styles.completeRayDiagonalB]} />
+      </View>
+    );
+  }
+
   if (action === 'create') {
     return (
       <View style={styles.iconFrame}>
@@ -313,6 +327,40 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     left: 6.25,
     width: 1.5,
     backgroundColor: colors.toastText,
+  },
+  completeRay: {
+    position: 'absolute',
+    width: 1.1,
+    height: 3,
+    backgroundColor: colors.toastText,
+  },
+  completeRayTop: {
+    top: 0,
+    left: 6.5,
+  },
+  completeRayRight: {
+    top: 5.5,
+    right: 0,
+    transform: [{ rotate: '90deg' }],
+  },
+  completeRayBottom: {
+    bottom: 0,
+    left: 6.5,
+  },
+  completeRayLeft: {
+    top: 5.5,
+    left: 0,
+    transform: [{ rotate: '90deg' }],
+  },
+  completeRayDiagonalA: {
+    top: 5.5,
+    left: 3.2,
+    transform: [{ rotate: '45deg' }],
+  },
+  completeRayDiagonalB: {
+    top: 5.5,
+    right: 3.2,
+    transform: [{ rotate: '-45deg' }],
   },
   editPencil: {
     position: 'absolute',

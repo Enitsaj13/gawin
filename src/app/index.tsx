@@ -1,10 +1,11 @@
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppMenuSheet } from '@/components/app-menu-sheet';
+import { useToast } from '@/components/toast';
 import {
   useFeedback,
   usePreferences,
@@ -20,14 +21,53 @@ import { ThemeColors, useAppTheme, useThemeStyles } from '@/theme/theme';
 
 type ComposerState = { mode: 'create' } | { mode: 'edit'; todo: Todo } | null;
 
+const COMPLETION_MESSAGES = [
+  'You did it. Day complete.',
+  'Well done today!',
+  'Today, well done!',
+  'You completed today!',
+  'Congrats!',
+  'Congrats, you did it!',
+  'Congrats on finishing!',
+  'Congrats—you completed today!',
+  'Congrats, day complete!',
+  'Congrats on a great day!',
+  'Congrats, all done!',
+  'Congrats on getting it done!',
+  'Congrats—you made it!',
+  'Nice work!',
+  'Great job!',
+  'Nicely done!',
+  'Excellent!',
+  'Way to go!',
+  'You nailed it!',
+  'Beautiful work!',
+  'Proud of you!',
+];
+
+function shuffleMessages(messages: string[]) {
+  const shuffled = [...messages];
+  for (let index = shuffled.length - 1; index > 0; index -= 1) {
+    const randomIndex = Math.floor(Math.random() * (index + 1));
+    [shuffled[index], shuffled[randomIndex]] = [
+      shuffled[randomIndex],
+      shuffled[index],
+    ];
+  }
+  return shuffled;
+}
+
 export default function HomeScreen() {
   const styles = useThemeStyles(createStyles);
   const { statusBarStyle } = useAppTheme();
   const feedback = useFeedback();
+  const { showToast } = useToast();
   const { backupDue } = usePreferences();
   const [composer, setComposer] = useState<ComposerState>(null);
   const [isReordering, setIsReordering] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const completionMessages = useRef<string[]>([]);
+  const lastCompletionMessage = useRef<string | null>(null);
   const {
     addTodo,
     clearTodoReminder,
@@ -56,6 +96,25 @@ export default function HomeScreen() {
   const pastDateCount = new Set(
     todos.filter((todo) => todo.date < today).map((todo) => todo.date),
   ).size;
+
+  const nextCompletionMessage = () => {
+    if (!completionMessages.current.length) {
+      completionMessages.current = shuffleMessages(COMPLETION_MESSAGES);
+      if (
+        completionMessages.current.length > 1 &&
+        completionMessages.current[0] === lastCompletionMessage.current
+      ) {
+        [completionMessages.current[0], completionMessages.current[1]] = [
+          completionMessages.current[1],
+          completionMessages.current[0],
+        ];
+      }
+    }
+
+    const message = completionMessages.current.shift()!;
+    lastCompletionMessage.current = message;
+    return message;
+  };
 
   return (
     <SafeAreaView edges={['top', 'bottom']} style={styles.safeArea}>
@@ -118,6 +177,12 @@ export default function HomeScreen() {
                   renderItem={(todo, reorderControls) => (
                     <TaskRow
                       {...reorderControls}
+                      onCompleteAll={
+                        !todo.completed && todayTodos.length > 0 &&
+                        completedTodayCount === todayTodos.length - 1
+                          ? () => showToast(nextCompletionMessage(), 'complete')
+                          : undefined
+                      }
                       isRepeating={isTodoRepeating(todo)}
                       onClearReminder={clearTodoReminder}
                       onDelete={deleteTodo}
