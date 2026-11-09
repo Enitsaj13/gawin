@@ -14,6 +14,27 @@
     <meta name="description" content="A minimalist, offline-first task app focused on today." />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="theme-color" content="#fbfbf9" />
+    <script>
+      (function () {
+        try {
+          const saved = localStorage.getItem('gawin.preferences.v1');
+          const mode = saved ? JSON.parse(saved).appearanceMode : 'system';
+          const dark =
+            mode === 'dark' ||
+            (mode === 'system' &&
+              window.matchMedia('(prefers-color-scheme: dark)').matches);
+          const background = dark ? '#121211' : '#fbfbf9';
+          document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
+          document.documentElement.style.backgroundColor = background;
+          document
+            .querySelector('meta[name="theme-color"]')
+            ?.setAttribute('content', background);
+          document
+            .querySelector('meta[name="apple-mobile-web-app-status-bar-style"]')
+            ?.setAttribute('content', dark ? 'black' : 'default');
+        } catch {}
+      })();
+    </script>
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="manifest" href="/manifest.json" />
     <title>%WEB_TITLE%</title>
