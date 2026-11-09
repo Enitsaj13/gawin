@@ -6,6 +6,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { TaskComposer } from '@/features/todos/task-composer';
+import { ReorderableTaskList } from '@/features/todos/reorderable-task-list';
 import { TaskRow } from '@/features/todos/task-row';
 import { useTodos } from '@/features/todos/todos-context';
 import { Todo } from '@/features/todos/types';
@@ -15,12 +16,14 @@ type ComposerState = { mode: 'create' } | { mode: 'edit'; todo: Todo } | null;
 
 export default function HomeScreen() {
   const [composer, setComposer] = useState<ComposerState>(null);
+  const [isReordering, setIsReordering] = useState(false);
   const {
     addTodo,
     deleteTodo,
     editTodo,
     getTodosForDate,
     isTodoRepeating,
+    reorderTodo,
     repeatTodoTomorrow,
     startDailyRepeat,
     stopDailyRepeat,
@@ -42,7 +45,7 @@ export default function HomeScreen() {
       <View style={styles.page}>
         <ScrollView
           contentContainerStyle={styles.scrollContent}
-          scrollEnabled={!composer}
+          scrollEnabled={!composer && !isReordering}
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.todaySection}>
@@ -91,21 +94,28 @@ export default function HomeScreen() {
 
             <View style={styles.todayTasks}>
               {todayTodos.length ? (
-                todayTodos.map((todo) => (
-                  <TaskRow
-                    isRepeating={isTodoRepeating(todo)}
-                    key={todo.id}
-                    onDelete={deleteTodo}
-                    onEdit={(selectedTodo) =>
-                      setComposer({ mode: 'edit', todo: selectedTodo })
-                    }
-                    onRepeatDaily={startDailyRepeat}
-                    onRepeatTomorrow={repeatTodoTomorrow}
-                    onStopRepeating={stopDailyRepeat}
-                    onToggle={toggleTodo}
-                    todo={todo}
-                  />
-                ))
+                <ReorderableTaskList
+                  onDragStateChange={setIsReordering}
+                  onReorder={(id, toIndex) =>
+                    reorderTodo(today, id, toIndex)
+                  }
+                  renderItem={(todo, reorderControls) => (
+                    <TaskRow
+                      {...reorderControls}
+                      isRepeating={isTodoRepeating(todo)}
+                      onDelete={deleteTodo}
+                      onEdit={(selectedTodo) =>
+                        setComposer({ mode: 'edit', todo: selectedTodo })
+                      }
+                      onRepeatDaily={startDailyRepeat}
+                      onRepeatTomorrow={repeatTodoTomorrow}
+                      onStopRepeating={stopDailyRepeat}
+                      onToggle={toggleTodo}
+                      todo={todo}
+                    />
+                  )}
+                  todos={todayTodos}
+                />
               ) : (
                 <View style={styles.emptyToday} />
               )}

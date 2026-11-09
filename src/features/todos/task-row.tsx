@@ -8,12 +8,16 @@ import {
   View,
 } from 'react-native';
 
+import {
+  ReorderGestureDetector,
+  TaskReorderControls,
+} from './reorderable-task-list';
 import { TaskActionsSheet } from './task-actions-sheet';
 import { Todo } from './types';
 
 type ActionSheetMode = 'actions' | 'delete' | null;
 
-type TaskRowProps = {
+type TaskRowProps = Partial<TaskReorderControls> & {
   compact?: boolean;
   isRepeating?: boolean;
   todo: Todo;
@@ -29,6 +33,10 @@ type TaskRowProps = {
 export function TaskRow({
   compact = false,
   isRepeating = false,
+  onMoveDown,
+  onMoveUp,
+  reorderGesture,
+  suppressPress,
   todo,
   onDelete,
   onEdit,
@@ -44,10 +52,6 @@ export function TaskRow({
   const [labelOpacity] = useState(
     () => new Animated.Value(todo.completed ? 0.52 : 1),
   );
-
-  const confirmDelete = () => {
-    if (onDelete) setActionSheetMode('delete');
-  };
 
   const openActions = () => {
     if (
@@ -65,6 +69,8 @@ export function TaskRow({
   };
 
   const pressLabel = () => {
+    if (suppressPress) return;
+
     if (onEdit) {
       onEdit(todo);
       return;
@@ -97,6 +103,53 @@ export function TaskRow({
     void Haptics.selectionAsync().catch(() => undefined);
     onToggle(todo.id);
   };
+
+  const labelButton = (
+    <Pressable
+      accessibilityActions={
+        onMoveUp || onMoveDown
+          ? [
+              ...(onMoveUp
+                ? [{ name: 'decrement' as const, label: 'Move up' }]
+                : []),
+              ...(onMoveDown
+                ? [{ name: 'increment' as const, label: 'Move down' }]
+                : []),
+            ]
+          : undefined
+      }
+      accessibilityHint={
+        reorderGesture
+          ? 'Tap to edit. Touch and hold, then drag to reorder.'
+          : onEdit
+            ? 'Opens the task editor'
+            : undefined
+      }
+      accessibilityLabel={`${onEdit ? 'Edit' : 'Toggle'} task: ${todo.title}`}
+      accessibilityRole="button"
+      onAccessibilityAction={(event) => {
+        if (event.nativeEvent.actionName === 'decrement') onMoveUp?.();
+        if (event.nativeEvent.actionName === 'increment') onMoveDown?.();
+      }}
+      onPress={pressLabel}
+      style={({ pressed }) => [
+        styles.labelButton,
+        pressed && styles.pressed,
+      ]}
+    >
+      <Animated.Text
+        numberOfLines={1}
+        style={[
+          styles.label,
+          compact && styles.compactLabel,
+          todo.completed && styles.completedLabel,
+          { opacity: labelOpacity },
+        ]}
+      >
+        {todo.title}
+      </Animated.Text>
+    </Pressable>
+  );
 
   return (
     <>
@@ -131,29 +184,13 @@ export function TaskRow({
           </Animated.View>
         </Pressable>
 
-        <Pressable
-          accessibilityHint={onEdit ? 'Opens the task editor' : undefined}
-          accessibilityLabel={`${onEdit ? 'Edit' : 'Toggle'} task: ${todo.title}`}
-          accessibilityRole="button"
-          onLongPress={confirmDelete}
-          onPress={pressLabel}
-          style={({ pressed }) => [
-            styles.labelButton,
-            pressed && styles.pressed,
-          ]}
-        >
-          <Animated.Text
-            numberOfLines={1}
-            style={[
-              styles.label,
-              compact && styles.compactLabel,
-              todo.completed && styles.completedLabel,
-              { opacity: labelOpacity },
-            ]}
-          >
-            {todo.title}
-          </Animated.Text>
-        </Pressable>
+        {reorderGesture ? (
+          <ReorderGestureDetector gesture={reorderGesture}>
+            {labelButton}
+          </ReorderGestureDetector>
+        ) : (
+          labelButton
+        )}
 
         {!compact &&
         (onEdit ||

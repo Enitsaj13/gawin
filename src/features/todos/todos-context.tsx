@@ -39,6 +39,7 @@ type TodosContextValue = {
   getTodosForDate: (date: string) => Todo[];
   isTodoRepeating: (todo: Todo) => boolean;
   moveTodoToToday: (id: string) => void;
+  reorderTodo: (date: string, id: string, toIndex: number) => void;
   repeatTodoTomorrow: (id: string) => void;
   restoreBackup: (backup: TodoBackup, mode: RestoreMode) => void;
   startDailyRepeat: (id: string) => void;
@@ -287,6 +288,31 @@ export function TodosProvider({ children }: PropsWithChildren) {
     [activeDate, setTodos, showToast],
   );
 
+  const reorderTodo = useCallback(
+    (date: string, id: string, toIndex: number) => {
+      setTodos((current) => {
+        const dateTodos = current.filter((todo) => todo.date === date);
+        const fromIndex = dateTodos.findIndex((todo) => todo.id === id);
+        const nextIndex = Math.min(
+          Math.max(toIndex, 0),
+          dateTodos.length - 1,
+        );
+
+        if (fromIndex < 0 || fromIndex === nextIndex) return current;
+
+        const reordered = [...dateTodos];
+        const [movedTodo] = reordered.splice(fromIndex, 1);
+        reordered.splice(nextIndex, 0, movedTodo);
+
+        let dateIndex = 0;
+        return current.map((todo) =>
+          todo.date === date ? reordered[dateIndex++] : todo,
+        );
+      });
+    },
+    [setTodos],
+  );
+
   const repeatTodoTomorrow = useCallback(
     (id: string) => {
       const todo = todos.find((item) => item.id === id);
@@ -413,6 +439,7 @@ export function TodosProvider({ children }: PropsWithChildren) {
       getTodosForDate,
       isTodoRepeating,
       moveTodoToToday,
+      reorderTodo,
       repeatTodoTomorrow,
       restoreBackup,
       startDailyRepeat,
@@ -431,6 +458,7 @@ export function TodosProvider({ children }: PropsWithChildren) {
       getTodosForDate,
       isTodoRepeating,
       moveTodoToToday,
+      reorderTodo,
       repeatTodoTomorrow,
       restoreBackup,
       startDailyRepeat,

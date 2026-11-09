@@ -6,6 +6,7 @@ import {
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect, useState } from 'react';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { ToastProvider } from '@/components/toast';
 import { LoadingScreen } from '@/features/todos/loading-screen';
@@ -44,10 +45,12 @@ export default function RootLayout() {
   if (!resourcesReady) return null;
 
   return (
-    <ToastProvider>
-      <TodosProvider>
-        <AppNavigator />
-      </TodosProvider>
-    </ToastProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <ToastProvider>
+        <TodosProvider>
+          <AppNavigator />
+        </TodosProvider>
+      </ToastProvider>
+    </GestureHandlerRootView>
   );
 }
