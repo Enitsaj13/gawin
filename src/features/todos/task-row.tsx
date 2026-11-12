@@ -13,6 +13,8 @@ import {
   usePreferences,
 } from '@/features/preferences/preferences-context';
 import { ThemeColors, useThemeStyles } from '@/theme/theme';
+import { formatTaskTime } from '@/features/reminders/schedule';
+import { useReminders } from '@/features/reminders/reminders-context';
 
 import {
   ReorderGestureDetector,
@@ -25,6 +27,7 @@ type ActionSheetMode = 'actions' | 'delete' | null;
 
 type TaskRowProps = Partial<TaskReorderControls> & {
   compact?: boolean;
+  detail?: boolean;
   isRepeating?: boolean;
   todo: Todo;
   onDelete?: (id: string) => void;
@@ -44,6 +47,7 @@ type TaskRowProps = Partial<TaskReorderControls> & {
 
 export function TaskRow({
   compact = false,
+  detail = false,
   isRepeating = false,
   onMoveDown,
   onMoveUp,
@@ -67,6 +71,10 @@ export function TaskRow({
   const styles = useThemeStyles(createStyles);
   const feedback = useFeedback();
   const { preferences } = usePreferences();
+  const reminders = useReminders();
+  const reminderStatus = reminders.status(todo);
+  const statusLabel = reminderStatus === 'scheduled' ? 'Scheduled' : reminderStatus === 'pending' ? (reminders.online ? 'Scheduling…' : 'Waiting for connection')
+    : reminderStatus === 'sent' ? 'Reminder sent' : reminderStatus === 'expired' ? 'Reminder time passed' : reminderStatus === 'failed' ? 'Reminder needs attention' : reminderStatus === 'limited' ? 'In-app only (limit)' : reminderStatus === 'setup' ? 'In-app only' : '';
   const [actionSheetMode, setActionSheetMode] =
     useState<ActionSheetMode>(null);
   const [checkboxScale] = useState(() => new Animated.Value(1));
@@ -193,9 +201,10 @@ export function TaskRow({
     >
       <View>
         <Animated.Text
-          numberOfLines={1}
+          numberOfLines={detail ? undefined : 1}
           style={[
             styles.label,
+            detail && { fontSize: 22, lineHeight: 34 },
             compact && styles.compactLabel,
             todo.completed && styles.completedLabel,
             { opacity: labelOpacity },
@@ -203,9 +212,9 @@ export function TaskRow({
         >
           {todo.title}
         </Animated.Text>
-        {!compact && todo.reminderAt ? (
+        {todo.scheduledAt || (!compact && todo.reminderAt) ? (
           <Text style={styles.reminderLabel}>
-            Remind {formatReminder(todo.reminderAt)}
+            {todo.scheduledAt ? formatTaskTime(todo) : todo.reminderAt ? `Remind ${formatReminder(todo.reminderAt)}` : ''}{!compact && statusLabel ? ` · ${statusLabel}` : ''}
           </Text>
         ) : null}
       </View>

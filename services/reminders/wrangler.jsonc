@@ -1,0 +1,22 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "gawin-reminders",
+  "main": "worker.ts",
+  "compatibility_date": "2026-11-12",
+  "workers_dev": true,
+  "triggers": { "crons": ["* * * * *"] },
+  "vars": {
+    "APP_ORIGIN": "https://gawin-phi.vercel.app",
+    "VAPID_PUBLIC_KEY": "BMpVBMIH8kIlSFOI1D1VeKiu5YNjg2DwGI5uBD1jjJ3LaAYNK9cg4HwYQgM7_2g_9QHfKwNy-nnzLKt0pyPIzRk",
+    "VAPID_SUBJECT": "mailto:jastineformentera.dev@gmail.com",
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "gawin-reminders",
+      "database_id": "b44cfe2f-f112-45d2-842f-97023b6f42fc",
+      "migrations_dir": "migrations",
+    },
+  ],
+  "observability": { "enabled": false },
+}

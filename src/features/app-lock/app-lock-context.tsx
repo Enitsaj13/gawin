@@ -13,6 +13,7 @@ type AppLockContextValue = {
   enabled: boolean;
   locked: boolean;
   covered: boolean;
+  devicePromptActive: boolean;
   delay: LockDelay;
   blockedUntil: number;
   deviceCapability: DeviceUnlockCapability | null;
@@ -39,6 +40,7 @@ export function AppLockProvider({ children }: PropsWithChildren) {
   const [storageError, setStorageError] = useState(false);
   const [locked, setLocked] = useState(true);
   const [covered, setCovered] = useState(false);
+  const [devicePromptActive, setDevicePromptActive] = useState(false);
   const [deviceCapability, setDeviceCapability] = useState<DeviceUnlockCapability | null>(null);
   const recordRef = useRef<LockRecord | null>(null);
   const activeRef = useRef(true);
@@ -152,6 +154,7 @@ export function AppLockProvider({ children }: PropsWithChildren) {
       });
     }
     systemPromptRef.current = false;
+    setDevicePromptActive(false);
     setCovered(!activeRef.current);
     if (!activeRef.current) lockNow();
   }, [lockNow]);
@@ -232,6 +235,7 @@ export function AppLockProvider({ children }: PropsWithChildren) {
     }
     busyRef.current = true;
     systemPromptRef.current = true;
+    setDevicePromptActive(true);
     const controller = new AbortController();
     promptAbortRef.current = controller;
     let settled = false;
@@ -269,6 +273,7 @@ export function AppLockProvider({ children }: PropsWithChildren) {
     const session = sessionRef.current;
     busyRef.current = true;
     systemPromptRef.current = true;
+    setDevicePromptActive(true);
     const controller = new AbortController();
     promptAbortRef.current = controller;
     let settled = false;
@@ -293,7 +298,7 @@ export function AppLockProvider({ children }: PropsWithChildren) {
     }
   }, [finishSystemPrompt, persist]);
 
-  return <Context.Provider value={{ ready, storageError, enabled: Boolean(record), locked, covered, delay: record?.delay ?? 30, blockedUntil: record?.blockedUntil ?? 0, deviceCapability, biometricEnabled: Boolean(record?.biometric), retryLoad, enable, authenticate, authenticateRecovery, unlock, changePin, recover, disable, setDelay, lockNow, enableDeviceUnlock, disableDeviceUnlock, unlockWithDevice }}>{children}</Context.Provider>;
+  return <Context.Provider value={{ ready, storageError, enabled: Boolean(record), locked, covered, devicePromptActive, delay: record?.delay ?? 30, blockedUntil: record?.blockedUntil ?? 0, deviceCapability, biometricEnabled: Boolean(record?.biometric), retryLoad, enable, authenticate, authenticateRecovery, unlock, changePin, recover, disable, setDelay, lockNow, enableDeviceUnlock, disableDeviceUnlock, unlockWithDevice }}>{children}</Context.Provider>;
 }
 
 export function useAppLock() {

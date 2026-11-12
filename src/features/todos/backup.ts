@@ -1,9 +1,10 @@
 import { fromDateKey, toDateKey } from '@/lib/date';
+import { REMINDER_OPTIONS, scheduledInstant, validTime } from '@/features/reminders/schedule';
 
-import { RepeatRule, Todo } from './types';
+import type { RepeatRule, Todo } from './types';
 
 export const BACKUP_FORMAT = 'gawin-backup';
-export const BACKUP_SCHEMA_VERSION = 1;
+export const BACKUP_SCHEMA_VERSION = 2;
 
 const LEGACY_BACKUP_FORMATS = ['todo-journal-backup'];
 
@@ -61,7 +62,7 @@ export function parseTodoBackup(content: string): TodoBackup {
     throw new BackupValidationError('This is not a Gawin backup.');
   }
 
-  if (parsed.schemaVersion !== BACKUP_SCHEMA_VERSION) {
+  if (parsed.schemaVersion !== 1 && parsed.schemaVersion !== BACKUP_SCHEMA_VERSION) {
     if (
       typeof parsed.schemaVersion === 'number' &&
       parsed.schemaVersion > BACKUP_SCHEMA_VERSION
@@ -158,6 +159,20 @@ function validateTask(value: unknown, index: number): Todo {
       );
     }
     task.reminderAt = new Date(value.reminderAt).toISOString();
+  }
+
+  if (value.scheduledTime !== undefined || value.scheduledAt !== undefined || value.timeZone !== undefined) {
+    if (!validTime(value.scheduledTime) || typeof value.scheduledAt !== 'string' || !Number.isFinite(Date.parse(value.scheduledAt)) || typeof value.timeZone !== 'string' || value.timeZone.length > 100) throw new BackupValidationError(`Task ${index + 1} has an invalid scheduled time.`);
+    try {
+      scheduledInstant(task.date, value.scheduledTime, value.timeZone);
+      const parts = Object.fromEntries(new Intl.DateTimeFormat('en-CA', { timeZone: value.timeZone, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(new Date(value.scheduledAt)).filter((part) => part.type !== 'literal').map((part) => [part.type, part.value]));
+      if (`${parts.year}-${parts.month}-${parts.day}` !== task.date || `${parts.hour}:${parts.minute}` !== value.scheduledTime) throw new Error();
+    } catch { throw new BackupValidationError(`Task ${index + 1} has inconsistent date and time information.`); }
+    task.scheduledTime = value.scheduledTime; task.scheduledAt = value.scheduledAt; task.timeZone = value.timeZone;
+  }
+  if (value.reminderMinutes !== undefined) {
+    if (!REMINDER_OPTIONS.includes(value.reminderMinutes as typeof REMINDER_OPTIONS[number]) || !task.scheduledAt || !task.reminderAt || Date.parse(task.reminderAt) !== Date.parse(task.scheduledAt) - Number(value.reminderMinutes) * 60_000) throw new BackupValidationError(`Task ${index + 1} has an invalid reminder offset.`);
+    task.reminderMinutes = Number(value.reminderMinutes);
   }
 
   return task;

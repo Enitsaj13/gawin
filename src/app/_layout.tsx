@@ -20,6 +20,8 @@ import { LoadingScreen } from '@/features/todos/loading-screen';
 import { NavigationSkeleton } from '@/features/todos/navigation-skeleton';
 import { TodosProvider, useTodos } from '@/features/todos/todos-context';
 import { useAppTheme } from '@/theme/theme';
+import { RemindersProvider } from '@/features/reminders/reminders-context';
+import { ReminderAlert, ReminderNavigation } from '@/features/reminders/reminder-alert';
 
 void SplashScreen.preventAutoHideAsync();
 SplashScreen.setOptions({ duration: 220, fade: true });
@@ -47,6 +49,8 @@ function AppNavigator() {
           contentStyle: { backgroundColor: colors.background },
         }}
       />
+      <ReminderNavigation />
+      <ReminderAlert />
     </View>
   );
 }
@@ -97,13 +101,15 @@ function ThemedApp() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <AppLockGate>
-        <ToastProvider>
-          <TodosProvider>
-            <AppNavigator />
-          </TodosProvider>
-        </ToastProvider>
-      </AppLockGate>
+      <ToastProvider>
+        <TodosProvider>
+          <RemindersProvider>
+            <AppLockGate>
+              <AppNavigator />
+            </AppLockGate>
+          </RemindersProvider>
+        </TodosProvider>
+      </ToastProvider>
     </View>
   );
 }

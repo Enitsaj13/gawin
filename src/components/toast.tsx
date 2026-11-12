@@ -12,6 +12,7 @@ import { Animated, Platform, Pressable, StyleSheet, Text, View } from 'react-nat
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { usePreferences } from '@/features/preferences/preferences-context';
+import { useAppLock } from '@/features/app-lock/app-lock-context';
 import { ThemeColors, useThemeStyles } from '@/theme/theme';
 
 const FLOATING_BUTTON_SIZE = 56;
@@ -139,6 +140,7 @@ export function ToastProvider({ children }: PropsWithChildren) {
   const styles = useThemeStyles(createStyles);
   const insets = useSafeAreaInsets();
   const { preferences } = usePreferences();
+  const lock = useAppLock();
   const [toastState, setToastState] = useState<ToastState | null>(null);
   const [opacity] = useState(() => new Animated.Value(0));
   const [translateY] = useState(() => new Animated.Value(8));
@@ -230,7 +232,7 @@ export function ToastProvider({ children }: PropsWithChildren) {
     <ToastContext.Provider value={value}>
       <View style={styles.root}>
         {children}
-        {toastState ? (
+        {toastState && lock.ready && !lock.storageError && !(lock.enabled && (lock.locked || lock.covered)) ? (
           <View
             pointerEvents="box-none"
             style={[

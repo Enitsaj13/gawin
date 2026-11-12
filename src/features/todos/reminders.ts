@@ -1,12 +1,13 @@
 import * as Notifications from 'expo-notifications';
 import { AndroidImportance } from 'expo-notifications';
-import { Platform } from 'react-native';
+import { AppState, Platform } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
-    shouldPlaySound: false,
+    shouldPlaySound: AppState.currentState !== 'active',
     shouldSetBadge: false,
-    shouldShowBanner: true,
+    shouldShowBanner: AppState.currentState !== 'active',
     shouldShowList: true,
   }),
 });
@@ -25,6 +26,7 @@ export async function scheduleTaskReminder(
   title: string,
   reminderAt: string,
   requestPermission: boolean,
+  taskId?: string,
 ) {
   const existing = await Notifications.getPermissionsAsync();
   const permission =
@@ -35,11 +37,14 @@ export async function scheduleTaskReminder(
   if (permission.status !== 'granted') return null;
 
   await ensureAndroidChannel();
+  const preferences = await AsyncStorage.getItem('gawin.notification-preferences.v1');
+  const showTitles = preferences ? JSON.parse(preferences).showTitles === true : false;
   return Notifications.scheduleNotificationAsync({
     content: {
       title: 'Gawin',
-      body: title,
-      data: { url: '/' },
+      body: showTitles ? title : 'You have an upcoming task.',
+      sound: 'default',
+      data: { url: '/', taskId, reminderAt },
     },
     trigger: {
       type: Notifications.SchedulableTriggerInputTypes.DATE,

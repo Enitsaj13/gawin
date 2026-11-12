@@ -1,10 +1,17 @@
-export type Todo = {
+export type TaskSchedule = {
+  scheduledTime?: string;
+  scheduledAt?: string;
+  timeZone?: string;
+  reminderMinutes?: number;
+  reminderAt?: string;
+};
+
+export type Todo = TaskSchedule & {
   id: string;
   title: string;
   completed: boolean;
   date: string;
   recurrenceId?: string;
-  reminderAt?: string;
 };
 
 export type RepeatRule = {

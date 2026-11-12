@@ -1,0 +1,38 @@
+name: Deploy reminder service
+on:
+  workflow_dispatch:
+  push:
+    branches: [master]
+    paths:
+      - 'services/reminders/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/reminders.yml'
+permissions:
+  contents: read
+concurrency:
+  group: reminder-production
+  cancel-in-progress: false
+jobs:
+  deploy:
+    if: vars.REMINDERS_DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
+      SETUP_CODE: ${{ secrets.REMINDER_SETUP_CODE }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+      - run: corepack enable && corepack prepare pnpm@10.15.1 --activate
+      - run: pnpm install --frozen-lockfile
+      - name: Check deployment credentials
+        run: test -n "$CLOUDFLARE_API_TOKEN" && test -n "$CLOUDFLARE_ACCOUNT_ID" && test -n "$VAPID_PRIVATE_KEY" && test -n "$SETUP_CODE"
+      - run: pnpm reminders:check && pnpm test
+      - run: pnpm reminders:migrate && pnpm reminders:deploy
+      - name: Upload private Worker secrets
+        run: |
+          node -e 'process.stdout.write(JSON.stringify({VAPID_PRIVATE_KEY:process.env.VAPID_PRIVATE_KEY,SETUP_CODE:process.env.SETUP_CODE}))' | pnpm exec wrangler secret bulk --config services/reminders/wrangler.jsonc

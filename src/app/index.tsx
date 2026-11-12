@@ -18,6 +18,7 @@ import { Todo } from '@/features/todos/types';
 import { UnfinishedReviewSheet } from '@/features/todos/unfinished-review-sheet';
 import { formatJournalDate, formatWeekday } from '@/lib/date';
 import { ThemeColors, useAppTheme, useThemeStyles } from '@/theme/theme';
+import { NextTask } from '@/features/reminders/next-task';
 
 type ComposerState = { mode: 'create' } | { mode: 'edit'; todo: Todo } | null;
 
@@ -170,6 +171,7 @@ export default function HomeScreen() {
               </View>
             </View>
 
+            <NextTask />
             <View style={styles.todayTasks}>
               {todayTodos.length ? (
                 <ReorderableTaskList
@@ -247,15 +249,16 @@ export default function HomeScreen() {
           date={composer.mode === 'edit' ? composer.todo.date : today}
           heading={composer.mode === 'edit' ? 'Edit task' : 'New task'}
           initialTitle={composer.mode === 'edit' ? composer.todo.title : ''}
+          initialSchedule={composer.mode === 'edit' ? composer.todo : undefined}
           key={composer.mode === 'edit' ? composer.todo.id : 'new-task'}
           onClose={() => setComposer(null)}
-          onSubmit={(title, selectedDate, updateSeries) => {
+          onSubmit={(title, selectedDate, updateSeries, schedule) => {
             if (composer.mode === 'edit') {
-              editTodo(composer.todo.id, title, updateSeries, selectedDate);
+              editTodo(composer.todo.id, title, updateSeries, selectedDate, schedule);
               return;
             }
 
-            addTodo(title, selectedDate);
+            addTodo(title, selectedDate, schedule);
           }}
           submitLabel={composer.mode === 'edit' ? 'Save changes' : 'Add task'}
           visible

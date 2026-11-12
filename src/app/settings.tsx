@@ -2,7 +2,7 @@ import Constants from 'expo-constants';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { type ReactNode, useState } from 'react';
-import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BackButton } from '@/components/back-button';
@@ -10,6 +10,7 @@ import { useToast } from '@/components/toast';
 import { useAppLock } from '@/features/app-lock/app-lock-context';
 import { BiometricIcon } from '@/features/app-lock/biometric-icon';
 import { PinModal, PinMode } from '@/features/app-lock/pin-screen';
+import { NotificationSettings } from '@/features/reminders/notification-settings';
 import {
   BackupReminderDays,
   useFeedback,
@@ -256,11 +257,7 @@ export default function SettingsScreen() {
 
           <View style={styles.section}>
             <Text style={styles.eyebrow}>Task reminders</Text>
-            <Text style={styles.sectionBody}>
-              {Platform.OS === 'web'
-                ? 'Web reminders work while Gawin is open. A future native installation can alert you while the app is closed.'
-                : 'Reminders are scheduled locally on this device. Gawin does not send task titles to a server.'}
-            </Text>
+            <NotificationSettings />
           </View>
 
           <View style={styles.section}>

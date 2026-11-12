@@ -20,6 +20,8 @@ The name comes from the Filipino word _gawin_—to do or get something done.
 - Manageable daily defaults that create one fresh Today task each day
 - Repeating schedules for daily, weekday, weekend, or selected-day routines
 - Optional local task reminders
+- Optional task times, a themed Clock view, and a next-task indicator
+- Opt-in PWA background reminders through a separate free-plan Worker service
 - Optional six-digit App Lock with offline recovery and automatic locking
 - Optional device unlock: native Face ID/fingerprint and PWA passkeys
 - Minimalist action sheets, toast messages, and tactile feedback
@@ -33,7 +35,8 @@ The name comes from the Filipino word _gawin_—to do or get something done.
 ## Privacy and backups
 
 Gawin stores tasks locally on the device and does not require an internet
-connection. It does not automatically upload task data to a server.
+connection. By default, no task data is uploaded. Enabling background push
+reminders shares only the reminder metadata described below.
 
 Backups can be exported as readable JSON files and saved to Files, iCloud
 Drive, Google Drive, AirDrop, or another location supported by the device.
@@ -79,9 +82,27 @@ record. It is excluded from task backups. Turning it off removes Gawin's link;
 it does not delete a saved passkey from the system password manager. Recovery-code
 PIN resets turn device unlock off; you can enable it again after recovering.
 
-Task reminders are scheduled locally. Native builds can deliver them while the
-app is closed; browser reminders are best-effort and require the installed PWA
-to remain open.
+Native task reminders are scheduled locally. The PWA supports optional background
+Web Push through the reminder service in this repository. It must be deployed
+and connected before reminders can be confirmed as scheduled. Until then, PWA
+alerts work only while Gawin is open. Background delivery requires connectivity
+and notification permission, can be delayed, and follows device Focus settings.
+It is not a guaranteed Clock alarm.
+
+Choose a task date and optional time, then a reminder offset in the editor.
+Times retain the selected time zone, including across device travel. Clock lives
+under Menu and shows the current time and next timed tasks. Optional in-app sound
+is enabled by a tap for the current browser session. Dismiss keeps tasks unfinished;
+snooze creates a new reminder five minutes ahead. Repeating-task time/reminder
+changes apply to that occurrence only. Old backups remain compatible; new backups
+retain task times and reminder offsets.
+
+Push reminders upload only selected reminder schedules and a device subscription.
+Titles stay local by default. Offline edits and cancellations wait until Gawin is
+open and connected again. The server may send a previously registered reminder
+before it receives an offline cancellation. PINs and biometric credentials never
+go to the reminder backend. Setup and free-plan deployment are documented in
+[services/reminders/README.md](services/reminders/README.md).
 
 ## Built with
 
@@ -166,7 +187,9 @@ src/
 ├── app/                 # Expo Router screens and layouts
 ├── components/          # Shared interface components
 ├── features/todos/      # Tasks, routines, actions, and backup logic
+├── features/reminders/  # Task times, notification connection, and alerts
 └── lib/                 # Shared utilities
+services/reminders/     # Optional Cloudflare reminder service and setup guide
 ```
 
 ## Design

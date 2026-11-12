@@ -154,10 +154,11 @@ export default function DayScreen() {
           date={editingTodo.date}
           heading="Edit task"
           initialTitle={editingTodo.title}
+          initialSchedule={editingTodo}
           key={editingTodo.id}
           onClose={() => setEditingTodo(null)}
-          onSubmit={(title, selectedDate, updateSeries) =>
-            editTodo(editingTodo.id, title, updateSeries, selectedDate)
+          onSubmit={(title, selectedDate, updateSeries, schedule) =>
+            editTodo(editingTodo.id, title, updateSeries, selectedDate, schedule)
           }
           submitLabel="Save changes"
           visible

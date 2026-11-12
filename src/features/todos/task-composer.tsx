@@ -5,6 +5,7 @@ import {
   Modal,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -14,17 +15,21 @@ import type { ViewStyle } from 'react-native';
 
 import { formatJournalDate, fromDateKey, todayKey, toDateKey } from '@/lib/date';
 import { ThemeColors, useAppTheme, useThemeStyles } from '@/theme/theme';
+import { ScheduleFields, resolveSchedule } from '@/features/reminders/schedule-fields';
+import type { TaskSchedule } from './types';
 
 type TaskComposerProps = {
   allowSeriesUpdate?: boolean;
   allowDateSelection?: boolean;
+  allowScheduling?: boolean;
+  initialSchedule?: TaskSchedule;
   date: string;
   heading?: string;
   initialTitle?: string;
   submitLabel?: string;
   visible: boolean;
   onClose: () => void;
-  onSubmit: (title: string, date: string, updateSeries: boolean) => void;
+  onSubmit: (title: string, date: string, updateSeries: boolean, schedule: TaskSchedule) => void;
 };
 
 type WebViewport = {
@@ -34,13 +39,15 @@ type WebViewport = {
   width: number;
 };
 
-const webScrollLockStyle: ViewStyle & { touchAction: 'none' } = {
-  touchAction: 'none',
+const webScrollLockStyle: ViewStyle & { overscrollBehavior: 'none' } = {
+  overscrollBehavior: 'none',
 };
 
 export function TaskComposer({
   allowSeriesUpdate = false,
   allowDateSelection = true,
+  allowScheduling = true,
+  initialSchedule = {},
   date,
   heading = 'New task',
   initialTitle = '',
@@ -52,8 +59,14 @@ export function TaskComposer({
   const styles = useThemeStyles(createStyles);
   const { colors } = useAppTheme();
   const [title, setTitle] = useState(initialTitle);
+  const [schedule, setSchedule] = useState<TaskSchedule>(() => ({
+    scheduledTime: initialSchedule.scheduledTime, scheduledAt: initialSchedule.scheduledAt,
+    timeZone: initialSchedule.timeZone, reminderAt: initialSchedule.reminderAt, reminderMinutes: initialSchedule.reminderMinutes,
+  }));
+  const [scheduleError, setScheduleError] = useState('');
   const [selectedDate, setSelectedDate] = useState(date);
   const [calendarOpen, setCalendarOpen] = useState(false);
+  const [scheduleExpanded, setScheduleExpanded] = useState<'time' | 'reminder' | null>(null);
   const [visibleMonth, setVisibleMonth] = useState(() => fromDateKey(date));
   const [updateSeries, setUpdateSeries] = useState(false);
   const [inputFocused, setInputFocused] = useState(false);
@@ -109,7 +122,8 @@ export function TaskComposer({
 
   const submit = () => {
     if (!title.trim()) return;
-    onSubmit(title, selectedDate, updateSeries);
+    try { onSubmit(title, selectedDate, updateSeries, resolveSchedule(schedule, selectedDate, date, initialSchedule)); }
+    catch (error) { setScheduleError(error instanceof Error ? error.message : 'Please check the task time.'); return; }
     close();
   };
 
@@ -154,6 +168,7 @@ export function TaskComposer({
             style={StyleSheet.absoluteFill}
           />
           <View style={styles.sheet}>
+            <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
             <Text style={styles.eyebrow}>{formatJournalDate(selectedDate)}</Text>
             <Text style={styles.title}>{heading}</Text>
             <TextInput
@@ -185,6 +200,7 @@ export function TaskComposer({
                   accessibilityRole="button"
                   accessibilityState={{ expanded: calendarOpen }}
                   onPress={() => {
+                    setScheduleExpanded(null);
                     setCalendarOpen((open) => !open);
                     if (!calendarOpen) {
                       setVisibleMonth(fromDateKey(selectedDate));
@@ -231,23 +247,25 @@ export function TaskComposer({
                           accessibilityState={{ disabled: day < currentDate, selected: day === selectedDate }}
                           disabled={day < currentDate}
                           key={day}
-                          onPress={() => { setSelectedDate(day); setCalendarOpen(false); }}
+                          onPress={() => { setSelectedDate(day); setScheduleError(''); setCalendarOpen(false); }}
                           style={({ pressed }) => [styles.dayCell, day < currentDate && styles.pastDay, day === selectedDate && styles.selectedDay, pressed && styles.pressed]}
                         ><Text style={[styles.dayText, day < currentDate && styles.pastDayText, day === selectedDate && styles.selectedDayText]}>{fromDateKey(day).getDate()}</Text></Pressable>
                       ) : <View key={`blank-${index}`} style={styles.dayCell} />)}
                     </View>
                     <Pressable
                       accessibilityRole="button"
-                      onPress={() => { setSelectedDate(todayKey()); setVisibleMonth(fromDateKey(todayKey())); setCalendarOpen(false); }}
+                      onPress={() => { setSelectedDate(todayKey()); setScheduleError(''); setVisibleMonth(fromDateKey(todayKey())); setCalendarOpen(false); }}
                       style={({ pressed }) => [styles.todayShortcut, pressed && styles.pressed]}
                     ><Text style={styles.todayShortcutText}>Today</Text></Pressable>
                   </View>
                 ) : null}
               </View>
             ) : null}
+            {allowScheduling ? <ScheduleFields expanded={scheduleExpanded} setExpanded={setScheduleExpanded} date={selectedDate} value={schedule} onChange={(value) => { setSchedule(value); setScheduleError(''); }} onExpand={() => setCalendarOpen(false)} /> : null}
             {allowSeriesUpdate ? (
               <View style={styles.scopePicker}>
-                <Text style={styles.scopeLabel}>Apply changes to</Text>
+                <Text style={styles.scopeLabel}>Apply name changes to</Text>
+                <Text style={styles.scopeLabel}>Time and reminder apply to this task only.</Text>
                 <View style={styles.scopeOptions}>
                   <Pressable
                     accessibilityRole="radio"
@@ -290,6 +308,7 @@ export function TaskComposer({
                 </View>
               </View>
             ) : null}
+            {scheduleError ? <Text accessibilityLiveRegion="polite" style={styles.error}>{scheduleError}</Text> : null}
             <View style={styles.actions}>
               <Pressable
                 accessibilityLabel="Cancel task editor"
@@ -316,6 +335,7 @@ export function TaskComposer({
                 <Text style={styles.addText}>{submitLabel}</Text>
               </Pressable>
             </View>
+            </ScrollView>
           </View>
         </View>
       </KeyboardAvoidingView>
@@ -333,6 +353,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     backgroundColor: colors.scrim,
   },
   sheet: {
+    maxHeight: '94%',
     width: '100%',
     maxWidth: 560,
     alignSelf: 'center',
@@ -348,6 +369,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     fontFamily: 'SpaceMono_400Regular',
     fontSize: 11,
   },
+  error: { marginTop: 12, color: colors.textSecondary, fontFamily: 'SpaceMono_400Regular', fontSize: 10, lineHeight: 17 },
   title: {
     marginTop: 4,
     color: colors.text,

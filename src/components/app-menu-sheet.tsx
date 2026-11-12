@@ -16,7 +16,8 @@ import {
   useFeedback,
   usePreferences,
 } from '@/features/preferences/preferences-context';
-import { ThemeColors, useThemeStyles } from '@/theme/theme';
+import { ThemeColors, useAppTheme, useThemeStyles } from '@/theme/theme';
+import Svg, { Circle, Path } from 'react-native-svg';
 
 type AppMenuSheetProps = {
   onClose: () => void;
@@ -30,6 +31,7 @@ export function AppMenuSheet({
   upcomingDateCount = 0,
 }: AppMenuSheetProps) {
   const styles = useThemeStyles(createStyles);
+  const { colors } = useAppTheme();
   const insets = useSafeAreaInsets();
   const feedback = useFeedback();
   const { preferences } = usePreferences();
@@ -54,7 +56,7 @@ export function AppMenuSheet({
     ]).start();
   }, [backdropOpacity, preferences.reducedMotion, translateY]);
 
-  const dismiss = (destination?: '/defaults' | '/history' | '/settings' | '/upcoming') => {
+  const dismiss = (destination?: '/defaults' | '/history' | '/settings' | '/upcoming' | '/clock') => {
     if (closingRef.current) return;
     closingRef.current = true;
 
@@ -77,7 +79,7 @@ export function AppMenuSheet({
     });
   };
 
-  const navigate = (destination: '/defaults' | '/history' | '/settings' | '/upcoming') => {
+  const navigate = (destination: '/defaults' | '/history' | '/settings' | '/upcoming' | '/clock') => {
     feedback.selection();
     dismiss(destination);
   };
@@ -116,6 +118,10 @@ export function AppMenuSheet({
             <Text style={styles.title}>More</Text>
 
             <View style={styles.actionList}>
+              <Pressable accessibilityRole="button" accessibilityLabel="Open Clock" onPress={() => navigate('/clock')} style={({ pressed }) => [styles.actionRow, pressed && styles.pressed]}>
+                <Svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke={colors.textSecondary} strokeWidth={1.5} aria-hidden={true} focusable={false}><Circle cx={12} cy={12} r={9} /><Path d="M12 6v6l4 2" /></Svg>
+                <View style={styles.actionCopy}><Text style={styles.actionText}>Clock</Text><Text style={styles.actionMeta}>The time, and what’s next</Text></View><Text style={styles.arrow}>→</Text>
+              </Pressable>
               {upcomingDateCount ? (
                 <Pressable
                   accessibilityLabel={`Open upcoming tasks. ${upcomingDateCount} ${upcomingDateCount === 1 ? 'day' : 'days'} scheduled.`}

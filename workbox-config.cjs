@@ -8,5 +8,6 @@ module.exports = {
   navigateFallback: '/index.html',
   navigateFallbackDenylist: [/^\/_expo\//],
   skipWaiting: true,
+  importScripts: ['/push-handler.js'],
   swDest: 'dist/sw.js',
 };
