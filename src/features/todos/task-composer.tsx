@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Keyboard,
   KeyboardAvoidingView,
@@ -71,6 +71,53 @@ export function TaskComposer({
   const [updateSeries, setUpdateSeries] = useState(false);
   const [inputFocused, setInputFocused] = useState(false);
   const [webViewport, setWebViewport] = useState<WebViewport | null>(null);
+  const canScrollContent = calendarOpen || scheduleExpanded !== null || allowSeriesUpdate || Boolean(scheduleError);
+  const canScrollRef = useRef(canScrollContent);
+  useEffect(() => { canScrollRef.current = canScrollContent; }, [canScrollContent]);
+
+  useEffect(() => {
+    if (Platform.OS !== 'web' || !visible) return;
+    const page = document.documentElement;
+    const body = document.body;
+    const x = window.scrollX;
+    const y = window.scrollY;
+    const previousPage = { overflow: page.style.overflow, overscrollBehavior: page.style.overscrollBehavior };
+    const previousBody = {
+      position: body.style.position, top: body.style.top, left: body.style.left,
+      width: body.style.width, height: body.style.height, overflow: body.style.overflow,
+      overscrollBehavior: body.style.overscrollBehavior,
+    };
+    page.style.overflow = 'hidden';
+    page.style.overscrollBehavior = 'none';
+    Object.assign(body.style, {
+      position: 'fixed', top: `${-y}px`, left: `${-x}px`,
+      width: '100%', height: '100%', overflow: 'hidden', overscrollBehavior: 'none',
+    });
+    let lastY = 0;
+    const start = (event: TouchEvent) => { lastY = event.touches[0]?.clientY ?? 0; };
+    const move = (event: TouchEvent) => {
+      const node = document.getElementById('gawin-task-editor-content');
+      const nextY = event.touches[0]?.clientY ?? lastY;
+      const delta = nextY - lastY;
+      lastY = nextY;
+      // Permit only deliberate scrolling inside an overflowing picker. Prevent
+      // iOS from handing a drag at either boundary to the page behind the modal.
+      if (canScrollRef.current && node && event.target instanceof Node && node.contains(event.target) &&
+        node.scrollHeight > node.clientHeight + 1 &&
+        !(delta > 0 && node.scrollTop <= 0) &&
+        !(delta < 0 && node.scrollTop + node.clientHeight >= node.scrollHeight - 1)) return;
+      if (event.cancelable) event.preventDefault();
+    };
+    document.addEventListener('touchstart', start, { passive: true });
+    document.addEventListener('touchmove', move, { passive: false });
+    return () => {
+      document.removeEventListener('touchstart', start);
+      document.removeEventListener('touchmove', move);
+      Object.assign(page.style, previousPage);
+      Object.assign(body.style, previousBody);
+      window.scrollTo(x, y);
+    };
+  }, [visible]);
   const calendarDays = useMemo(() => {
     const firstDay = new Date(visibleMonth.getFullYear(), visibleMonth.getMonth(), 1, 12);
     const offset = firstDay.getDay();
@@ -168,7 +215,7 @@ export function TaskComposer({
             style={StyleSheet.absoluteFill}
           />
           <View style={styles.sheet}>
-            <ScrollView style={styles.content} contentContainerStyle={styles.contentInner} keyboardShouldPersistTaps="handled" bounces={false} showsVerticalScrollIndicator={false}>
+            <ScrollView nativeID="gawin-task-editor-content" scrollEnabled={canScrollContent} style={[styles.content, Platform.OS === 'web' && webScrollLockStyle]} contentContainerStyle={styles.contentInner} keyboardShouldPersistTaps="handled" bounces={false} showsVerticalScrollIndicator={false}>
             <Text style={styles.eyebrow}>{formatJournalDate(selectedDate)}</Text>
             <Text style={styles.title}>{heading}</Text>
             <TextInput
