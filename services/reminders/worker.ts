@@ -167,7 +167,9 @@ async function push(
   );
   return fetch(sub.endpoint, {
     ...payload,
-    redirect: 'error',
+    // Workers supports follow/manual only. Return redirects as failures rather
+    // than forwarding the encrypted payload and authorization to another host.
+    redirect: 'manual',
     signal: AbortSignal.timeout(10_000),
   });
 }
@@ -435,8 +437,10 @@ export async function dispatchDue(env: Env, now = Date.now()) {
         Math.max(1, Math.ceil((row.expires_at - now) / 1000)),
       );
       status = response.status;
-    } catch {
-      /* A bounded retry is safer than silently losing a reminder. */
+    } catch (error) {
+      // Never log subscription endpoints, payloads, or credentials.
+      const reason = String(error).replace(/https?:\/\/\S+|[A-Za-z0-9_=-]{32,}/g, '[redacted]').slice(0, 180);
+      console.warn('Reminder push could not be constructed or sent.', reason);
     }
     if (status >= 200 && status < 300) {
       await env.DB.batch([
@@ -448,6 +452,7 @@ export async function dispatchDue(env: Env, now = Date.now()) {
         ).bind(row.device_id, row.id, row.version, lease),
       ]);
     } else {
+      console.warn('Reminder push rejected', { status, attempt: row.attempts + 1 });
       if (status === 404 || status === 410)
         await env.DB.prepare('UPDATE devices SET invalid=1 WHERE id=?')
           .bind(row.device_id)

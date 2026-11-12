@@ -115,6 +115,7 @@ test('encrypted Apple-compatible pushes contain a generic body and are idempoten
   t.mock.method(globalThis, 'fetch', async (url, request) => {
     calls++;
     assert.equal(url, f.subscription.endpoint);
+    assert.equal(request.redirect, 'manual', 'Workers must return redirects without following them');
     assert.equal(new Headers(request.headers).get('content-encoding'), 'aes128gcm');
     assert.match(new Headers(request.headers).get('authorization'), /^vapid /);
     const data = decryptPush(request.body, f.receiver, f.auth);
@@ -128,6 +129,19 @@ test('encrypted Apple-compatible pushes contain a generic body and are idempoten
   await f.sync([{ ...f.row, version: 'b'.repeat(64), body: 'Changed title' }], 2);
   await dispatchDue(f.env, f.now);
   assert.equal(calls, 1, 'editing text does not redeliver an already-sent time');
+});
+test('a push service redirect is never followed or recorded as delivered', async (t) => {
+  const f = await fixture(t);
+  await f.sync([f.row], 1);
+  const send = t.mock.method(globalThis, 'fetch', async (_url, request) => {
+    // Cloudflare rejects redirect:error, unlike Node's fetch.
+    assert.equal(request.redirect, 'manual');
+    return new Response(null, { status: 302, headers: { Location: 'https://other.example' } });
+  });
+  await dispatchDue(f.env, f.now);
+  assert.equal(send.mock.callCount(), 1);
+  assert.equal(f.sqlite.prepare('SELECT status FROM reminders').get().status, 'failed');
+  assert.equal(f.sqlite.prepare('SELECT COUNT(*) AS total FROM deliveries').get().total, 0);
 });
 test('resync keeps an in-flight lease, and cancelling during a send cannot resurrect the reminder', async (t) => {
   const f = await fixture(t);
