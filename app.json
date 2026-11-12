@@ -43,7 +43,8 @@
           "enableRemoteNotifications": false
         }
       ],
-      "expo-sharing"
+      "expo-sharing",
+      "expo-secure-store"
     ],
     "experiments": {
       "typedRoutes": true,

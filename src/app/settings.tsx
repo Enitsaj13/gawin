@@ -1,10 +1,14 @@
 import Constants from 'expo-constants';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { useState } from 'react';
 import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BackButton } from '@/components/back-button';
+import { useToast } from '@/components/toast';
+import { useAppLock } from '@/features/app-lock/app-lock-context';
+import { PinModal, PinMode } from '@/features/app-lock/pin-screen';
 import {
   BackupReminderDays,
   useFeedback,
@@ -35,6 +39,10 @@ export default function SettingsScreen() {
   const styles = useThemeStyles(createStyles);
   const { statusBarStyle } = useAppTheme();
   const feedback = useFeedback();
+  const lock = useAppLock();
+  const { showToast } = useToast();
+  const [pinMode, setPinMode] = useState<Exclude<PinMode, 'unlock'> | null>(null);
+  const [lockError, setLockError] = useState('');
   const { dailyDefaults } = useTodos();
   const {
     preferences,
@@ -127,6 +135,43 @@ export default function SettingsScreen() {
               <Text style={styles.navigationCount}>{dailyDefaults.length}</Text>
               <Text style={styles.navigationArrow}>→</Text>
             </Pressable>
+          </View>
+
+          <View style={styles.section}>
+            <Text style={styles.eyebrow}>Privacy</Text>
+            <SettingToggle
+              enabled={lock.enabled}
+              label="App Lock"
+              onPress={() => { feedback.selection(); setPinMode(lock.enabled ? 'disable' : 'setup'); }}
+            />
+            <Text style={styles.sectionBody}>
+              {lock.enabled ? 'Your six-digit PIN is required when opening Gawin.' : 'Keep access private with a six-digit PIN. Works offline.'}
+            </Text>
+            {lock.enabled ? <>
+              <Pressable accessibilityRole="button" onPress={() => setPinMode('change')} style={({ pressed }) => [styles.navigationRow, pressed && styles.pressed]}>
+                <Text style={styles.navigationTitle}>Change PIN</Text>
+                <Text style={styles.navigationArrow}>→</Text>
+              </Pressable>
+              <Text style={styles.subsectionTitle}>Lock after leaving</Text>
+              <View style={styles.optionList}>
+                {([{ label: 'Immediately', value: 0 }, { label: 'After 30 seconds', value: 30 }] as const).map((option) => (
+                  <Pressable accessibilityRole="radio" accessibilityState={{ checked: lock.delay === option.value }} key={option.value} onPress={() => {
+                    feedback.selection();
+                    setLockError('');
+                    void lock.setDelay(option.value).catch(() => setLockError('Could not save that setting. Please try again.'));
+                  }} style={({ pressed }) => [styles.optionRow, pressed && styles.pressed]}>
+                    <Text style={styles.optionText}>{option.label}</Text>
+                    <View style={[styles.radio, lock.delay === option.value && styles.radioSelected]}>{lock.delay === option.value ? <View style={styles.radioDot} /> : null}</View>
+                  </Pressable>
+                ))}
+              </View>
+              <Pressable accessibilityRole="button" onPress={lock.lockNow} style={({ pressed }) => [styles.navigationRow, pressed && styles.pressed]}>
+                <Text style={styles.navigationTitle}>Lock now</Text>
+                <Text style={styles.navigationArrow}>→</Text>
+              </Pressable>
+              {lockError ? <Text accessibilityLiveRegion="polite" style={styles.sectionBody}>{lockError}</Text> : null}
+            </> : null}
+            <Text style={styles.sectionBody}>App Lock protects access in Gawin. Exported backups remain readable and do not include your PIN or recovery code.</Text>
           </View>
 
           <View style={styles.section}>
@@ -226,6 +271,15 @@ export default function SettingsScreen() {
           </View>
         </ScrollView>
       </View>
+      {pinMode ? <PinModal
+        key={pinMode}
+        mode={pinMode}
+        onClose={() => setPinMode(null)}
+        onDone={() => {
+          showToast(pinMode === 'setup' ? 'App Lock enabled' : pinMode === 'disable' ? 'App Lock turned off' : 'PIN changed', 'edit');
+          setPinMode(null);
+        }}
+      /> : null}
     </SafeAreaView>
   );
 }

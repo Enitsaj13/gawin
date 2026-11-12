@@ -20,6 +20,7 @@ The name comes from the Filipino word _gawin_—to do or get something done.
 - Manageable daily defaults that create one fresh Today task each day
 - Repeating schedules for daily, weekday, weekend, or selected-day routines
 - Optional local task reminders
+- Optional six-digit App Lock with offline recovery and automatic locking
 - Minimalist action sheets, toast messages, and tactile feedback
 - Preferences for haptics, reduced motion, and backup reminders
 - Fully offline storage with no account required
@@ -38,6 +39,20 @@ Drive, Google Drive, AirDrop, or another location supported by the device.
 During import, Gawin validates and previews the file before making changes.
 
 Because backup files contain task titles, keep them somewhere private.
+
+App Lock is optional in **Settings → Privacy**. Create a six-digit PIN, confirm
+it, and save the recovery code outside Gawin before enabling the lock. The app
+locks on a fresh launch and after 30 seconds away by default; immediate locking
+is also available. Changing or removing the PIN requires the current PIN.
+If you forget it, use the saved recovery code to choose a new PIN.
+
+PINs are never stored as plain text. Verification uses salted PBKDF2-SHA256
+with 600,000 iterations and persistent retry delays. Native credentials use
+SecureStore; the PWA keeps verification records in browser storage. This is an
+interface privacy lock, not encryption of task storage. Clearing browser data
+can remove the lock and tasks. PINs and recovery credentials are excluded from
+task backups, so keep the recovery code separately. Biometric unlock is not
+included yet.
 
 Task reminders are scheduled locally. Native builds can deliver them while the
 app is closed; browser reminders are best-effort and require the installed PWA
@@ -70,6 +85,9 @@ npx expo start
 
 From the Expo terminal, scan the QR code with Expo Go or select an available
 simulator or emulator.
+
+Existing native development builds must be rebuilt after adding the App Lock
+dependencies (`expo-crypto` and `expo-secure-store`). The PWA needs no native build.
 
 ### Run the web app
 

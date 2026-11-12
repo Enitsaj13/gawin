@@ -10,6 +10,8 @@ import { Appearance, Platform, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { ToastProvider } from '@/components/toast';
+import { AppLockProvider } from '@/features/app-lock/app-lock-context';
+import { AppLockGate } from '@/features/app-lock/app-lock-gate';
 import {
   PreferencesProvider,
   usePreferences,
@@ -95,11 +97,13 @@ function ThemedApp() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <ToastProvider>
-        <TodosProvider>
-          <AppNavigator />
-        </TodosProvider>
-      </ToastProvider>
+      <AppLockGate>
+        <ToastProvider>
+          <TodosProvider>
+            <AppNavigator />
+          </TodosProvider>
+        </ToastProvider>
+      </AppLockGate>
     </View>
   );
 }
@@ -120,7 +124,9 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <PreferencesProvider>
-        <ThemedApp />
+        <AppLockProvider>
+          <ThemedApp />
+        </AppLockProvider>
       </PreferencesProvider>
     </GestureHandlerRootView>
   );
