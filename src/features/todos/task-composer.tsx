@@ -168,7 +168,7 @@ export function TaskComposer({
             style={StyleSheet.absoluteFill}
           />
           <View style={styles.sheet}>
-            <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+            <ScrollView style={styles.content} contentContainerStyle={styles.contentInner} keyboardShouldPersistTaps="handled" bounces={false} showsVerticalScrollIndicator={false}>
             <Text style={styles.eyebrow}>{formatJournalDate(selectedDate)}</Text>
             <Text style={styles.title}>{heading}</Text>
             <TextInput
@@ -177,7 +177,7 @@ export function TaskComposer({
               maxLength={80}
               onBlur={() => setInputFocused(false)}
               onChangeText={setTitle}
-              onFocus={() => setInputFocused(true)}
+              onFocus={() => { setInputFocused(true); setCalendarOpen(false); setScheduleExpanded(null); }}
               onSubmitEditing={submit}
               placeholder="What needs to be done?"
               placeholderTextColor={colors.textMuted}
@@ -209,8 +209,8 @@ export function TaskComposer({
                   }}
                   style={({ pressed }) => [styles.dateButton, pressed && styles.pressed]}
                 >
-                  <View>
-                    <Text style={styles.dateLabel}>DATE</Text>
+                  <View style={styles.dateSummary}>
+                    <Text style={styles.dateLabel}>Date</Text>
                     <Text style={styles.dateValue}>
                       {selectedDate === todayKey() ? 'Today' : formatJournalDate(selectedDate)}
                     </Text>
@@ -309,6 +309,7 @@ export function TaskComposer({
               </View>
             ) : null}
             {scheduleError ? <Text accessibilityLiveRegion="polite" style={styles.error}>{scheduleError}</Text> : null}
+            </ScrollView>
             <View style={styles.actions}>
               <Pressable
                 accessibilityLabel="Cancel task editor"
@@ -335,7 +336,6 @@ export function TaskComposer({
                 <Text style={styles.addText}>{submitLabel}</Text>
               </Pressable>
             </View>
-            </ScrollView>
           </View>
         </View>
       </KeyboardAvoidingView>
@@ -359,11 +359,14 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     alignSelf: 'center',
     backgroundColor: colors.surface,
     paddingHorizontal: 24,
-    paddingTop: 28,
-    paddingBottom: Platform.OS === 'ios' ? 38 : 26,
+    paddingTop: 18,
+    paddingBottom: Platform.OS === 'ios' ? 24 : 16,
     borderTopWidth: 1,
     borderColor: colors.accent,
   },
+  content: { flexGrow: 0, flexShrink: 1, minHeight: 0 },
+  contentInner: { paddingBottom: 2 },
+  dateSummary: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, paddingRight: 16 },
   eyebrow: {
     color: colors.textMuted,
     fontFamily: 'SpaceMono_400Regular',
@@ -374,16 +377,16 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     marginTop: 4,
     color: colors.text,
     fontFamily: 'SpaceMono_700Bold',
-    fontSize: 23,
+    fontSize: 20,
   },
   input: {
-    minHeight: 54,
-    marginTop: 24,
+    minHeight: 48,
+    marginTop: 12,
     borderBottomWidth: 1,
     borderColor: colors.accent,
     color: colors.text,
     fontFamily: 'SpaceMono_400Regular',
-    fontSize: 15,
+    fontSize: 16,
     paddingVertical: 12,
   },
   inputWeb: {
@@ -393,11 +396,11 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     borderBottomWidth: 2,
   },
   datePicker: {
-    marginTop: 18,
+    marginTop: 8,
   },
   dateButton: {
-    minHeight: 48,
-    paddingVertical: 8,
+    minHeight: 44,
+    paddingVertical: 6,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderColor: colors.borderStrong,
     flexDirection: 'row',
@@ -408,10 +411,8 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     color: colors.textMuted,
     fontFamily: 'SpaceMono_400Regular',
     fontSize: 9,
-    letterSpacing: 1,
   },
   dateValue: {
-    marginTop: 2,
     color: colors.text,
     fontFamily: 'SpaceMono_700Bold',
     fontSize: 12,
@@ -451,7 +452,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   monthArrow: {
     color: colors.textSecondary,
     fontFamily: 'SpaceMono_400Regular',
-    fontSize: 23,
+    fontSize: 20,
   },
   calendarGrid: {
     flexDirection: 'row',
@@ -503,12 +504,13 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     textDecorationLine: 'underline',
   },
   actions: {
-    marginTop: 24,
+    marginTop: 14,
+    flexShrink: 0,
     flexDirection: 'row',
     gap: 10,
   },
   scopePicker: {
-    marginTop: 20,
+    marginTop: 12,
   },
   scopeLabel: {
     color: colors.textMuted,
@@ -542,7 +544,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     color: colors.accentText,
   },
   cancel: {
-    minHeight: 50,
+    minHeight: 46,
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
@@ -550,7 +552,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     borderColor: colors.accent,
   },
   add: {
-    minHeight: 50,
+    minHeight: 46,
     flex: 1.4,
     alignItems: 'center',
     justifyContent: 'center',

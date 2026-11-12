@@ -30,9 +30,14 @@ export function ScheduleFields({ value, onChange, date, onExpand, expanded, setE
     onChange({ ...value, scheduledTime: time, timeZone: value.timeZone ?? currentTimeZone() }); setExpanded(null); Keyboard.dismiss();
   };
   return <View style={styles.fields}>
+    <View style={styles.summaries}>
     <Pressable accessibilityRole="button" accessibilityLabel={`Task time: ${label}`} accessibilityState={{ expanded: expanded === 'time' }} onPress={() => toggle('time')} style={styles.row}>
       <Text style={styles.label}>Time</Text><Text style={styles.value}>{label} {expanded === 'time' ? '−' : '+'}</Text>
     </Pressable>
+    <Pressable accessibilityRole="button" accessibilityState={{ expanded: expanded === 'reminder' }} onPress={() => toggle('reminder')} style={styles.row}>
+      <Text style={styles.label}>Remind me</Text><Text style={styles.value}>{value.reminderMinutes !== undefined ? reminderLabel(value.reminderMinutes) : value.reminderAt ? 'Custom reminder' : 'Off'} {expanded === 'reminder' ? '−' : '+'}</Text>
+    </Pressable>
+    </View>
     {expanded === 'time' ? <View style={styles.picker}>
       <View style={styles.timeInputs}>
         <TextInput accessibilityLabel="Hour, 1 to 12" keyboardType="number-pad" maxLength={2} onChangeText={(text) => setHour(text.replace(/\D/g, ''))} value={hour} selectTextOnFocus selectionColor={colors.accent} style={[styles.numberInput, Platform.OS === 'web' && styles.webInput]} />
@@ -47,16 +52,16 @@ export function ScheduleFields({ value, onChange, date, onExpand, expanded, setE
         <Pressable accessibilityRole="button" onPress={applyTime} style={styles.done}><Text style={styles.doneText}>Set time</Text></Pressable>
       </View>
     </View> : null}
-    <Pressable accessibilityRole="button" accessibilityState={{ expanded: expanded === 'reminder' }} onPress={() => toggle('reminder')} style={styles.row}>
-      <Text style={styles.label}>Remind me</Text><Text style={styles.value}>{value.reminderMinutes !== undefined ? reminderLabel(value.reminderMinutes) : value.reminderAt ? 'Custom reminder' : 'Off'} {expanded === 'reminder' ? '−' : '+'}</Text>
-    </Pressable>
     {expanded === 'reminder' ? <View style={styles.picker}>
+      <View accessibilityRole="radiogroup" accessibilityLabel="Reminder timing" style={styles.options}>
       {[undefined, ...REMINDER_OPTIONS].map((minutes) => {
         const selected = minutes === undefined ? !value.reminderAt && value.reminderMinutes === undefined : value.reminderMinutes === minutes;
-        return <Pressable accessibilityRole="radio" accessibilityState={{ checked: selected, disabled: minutes !== undefined && !value.scheduledTime }} disabled={minutes !== undefined && !value.scheduledTime} key={minutes ?? 'off'} onPress={() => { onChange({ ...value, reminderAt: undefined, reminderMinutes: minutes }); setExpanded(null); }} style={[styles.option, minutes !== undefined && !value.scheduledTime && styles.disabled]}>
-          <Text style={styles.value}>{minutes === undefined ? 'Off' : reminderLabel(minutes)}</Text><View style={[styles.radio, selected && styles.selected]} />
+        return <Pressable accessibilityRole="radio" accessibilityState={{ checked: selected, disabled: minutes !== undefined && !value.scheduledTime }} disabled={minutes !== undefined && !value.scheduledTime} key={minutes ?? 'off'} onPress={() => { onChange({ ...value, reminderAt: undefined, reminderMinutes: minutes }); setExpanded(null); }} style={({ pressed }) => [styles.option, minutes !== undefined && !value.scheduledTime && styles.disabled, pressed && styles.optionPressed]}>
+          <View style={[styles.radio, selected && styles.radioSelected]}>{selected ? <View style={styles.radioCheck} /> : null}</View>
+          <Text style={[styles.optionText, selected && styles.optionTextSelected]}>{minutes === undefined ? 'Off' : minutes === 0 ? 'At start' : `${minutes} min before`}</Text>
         </Pressable>;
       })}
+      </View>
       <Text style={styles.note}>{!value.scheduledTime ? 'Choose a task time first.' : info?.connected ? 'Background reminders follow your phone settings. Delivery can be delayed.' : 'Until notifications are connected in Settings, alerts only appear while Gawin is open.'}</Text>
     </View> : null}
   </View>;
@@ -65,14 +70,22 @@ export function ScheduleFields({ value, onChange, date, onExpand, expanded, setE
 export { resolveSchedule } from './schedule';
 
 const createStyles = (colors: ThemeColors) => StyleSheet.create({
-  fields: { marginTop: 4 }, row: { minHeight: 49, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: colors.borderStrong, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  fields: { marginTop: 4 }, summaries: { flexDirection: 'row', gap: 20 }, row: { flex: 1, minWidth: 0, minHeight: 52, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: colors.borderStrong, justifyContent: 'center', gap: 4 },
   label: { fontFamily: 'SpaceMono_400Regular', fontSize: 11, color: colors.textMuted }, value: { fontFamily: 'SpaceMono_400Regular', fontSize: 11, color: colors.textSecondary },
-  picker: { paddingVertical: 14 }, timeInputs: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
+  picker: { paddingVertical: 10 }, timeInputs: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
   numberInput: { width: 64, height: 54, textAlign: 'center', borderBottomWidth: 1, borderColor: colors.accent, color: colors.text, fontFamily: 'SpaceMono_400Regular', fontSize: 25 },
   separator: { color: colors.text, fontFamily: 'SpaceMono_400Regular', fontSize: 24 }, webInput: { outlineWidth: 0 }, periodGroup: { marginLeft: 8, gap: 4 },
   period: { paddingHorizontal: 12, minHeight: 30, justifyContent: 'center', borderWidth: 1, borderColor: colors.borderStrong }, periodText: { color: colors.textSecondary, fontFamily: 'SpaceMono_700Bold', fontSize: 10 },
   selected: { backgroundColor: colors.accent, borderColor: colors.accent }, selectedText: { color: colors.accentText }, note: { color: colors.textMuted, fontFamily: 'SpaceMono_400Regular', fontSize: 9, lineHeight: 17, marginTop: 10 },
   pickerActions: { marginTop: 12, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }, link: { minHeight: 44, justifyContent: 'center' }, linkText: { color: colors.textSecondary, fontFamily: 'SpaceMono_400Regular', fontSize: 10, textDecorationLine: 'underline' },
   done: { backgroundColor: colors.accent, paddingHorizontal: 20, minHeight: 44, justifyContent: 'center' }, doneText: { color: colors.accentText, fontFamily: 'SpaceMono_700Bold', fontSize: 10 },
-  option: { minHeight: 42, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }, radio: { width: 10, height: 10, borderWidth: 1, borderColor: colors.borderStrong }, disabled: { opacity: 0.35 },
+  options: { flexDirection: 'row', flexWrap: 'wrap', columnGap: 8, rowGap: 2 },
+  option: { minHeight: 44, width: '48%', flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8 },
+  optionPressed: { opacity: 0.58 },
+  optionText: { flexShrink: 1, fontFamily: 'SpaceMono_400Regular', fontSize: 10, lineHeight: 16, color: colors.textSecondary },
+  optionTextSelected: { fontFamily: 'SpaceMono_700Bold', color: colors.text },
+  radio: { width: 14, height: 14, flexShrink: 0, borderWidth: 1, borderColor: colors.borderStrong, alignItems: 'center', justifyContent: 'center' },
+  radioSelected: { borderColor: colors.accent },
+  radioCheck: { width: 4, height: 7, borderRightWidth: 1.5, borderBottomWidth: 1.5, borderColor: colors.accent, transform: [{ translateY: -1 }, { rotate: '45deg' }] },
+  disabled: { opacity: 0.35 },
 });
