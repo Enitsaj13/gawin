@@ -16,6 +16,7 @@ export function NotificationSettings() {
   return <View>
     <View style={styles.statusRow}><Text style={styles.title}>Notifications</Text><Text style={styles.status}>{info?.connected ? 'Connected' : info?.permission === 'denied' ? 'Blocked' : 'Not connected'}</Text></View>
     <Text style={styles.body}>{info?.description ?? 'Checking notification support…'}</Text>
+    {Platform.OS === 'web' ? <Text style={styles.body}>When Gawin is closed, reminders use your phone’s notification sound. Manage Sounds and Focus in your phone settings. The Alarm sound switch in Clock controls only the in-app alarm.</Text> : null}
     {info?.supported && info.configured && !info.connected ? <>
       {Platform.OS === 'web' ? <Text style={styles.body}>Only reminder times and this device’s notification subscription are shared. Task titles stay private unless you choose to show them.</Text> : null}
       <Pressable accessibilityRole="button" accessibilityState={{ busy: reminders.busy }} disabled={reminders.busy || !reminders.online || info.permission === 'denied'} onPress={() => void run(reminders.connect, 'Notifications enabled on this device. Your reminders will now sync.')} style={[styles.primary, (reminders.busy || !reminders.online || info.permission === 'denied') && styles.disabled]}><Text style={styles.primaryText}>{reminders.busy ? 'Connecting…' : 'Enable notifications'}</Text></Pressable>

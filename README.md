@@ -92,7 +92,10 @@ It is not a guaranteed Clock alarm.
 Choose a task date and optional time, then a reminder offset in the editor.
 Times retain the selected time zone, including across device travel. Clock lives
 under Menu and shows the current time and next timed tasks. Optional in-app sound
-is enabled by a tap for the current browser session. Dismiss keeps tasks unfinished;
+stays enabled on this device until you turn it off. Browsers may need a tap after
+reopening to allow audio; an enable-sound control appears when needed. The repeating alarm plays
+while Gawin is open, and background reminders use the phone's notification sound.
+Dismiss keeps tasks unfinished;
 snooze creates a new reminder five minutes ahead. Repeating-task time/reminder
 changes apply to that occurrence only. Old backups remain compatible; new backups
 retain task times and reminder offsets.

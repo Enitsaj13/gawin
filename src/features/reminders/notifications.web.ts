@@ -175,27 +175,50 @@ export function notificationEvents(handler: (event: ReminderEvent) => void) {
   navigator.serviceWorker?.addEventListener('message', listener);
   return () => navigator.serviceWorker?.removeEventListener('message', listener);
 }
+const SOUND_PREFERENCE = 'gawin.alarm-sound.v1';
+const sounding = new Set<OscillatorNode>();
+export function alarmSoundEnabled() {
+  try { return localStorage.getItem(SOUND_PREFERENCE) === 'on'; } catch { return false; }
+}
+export function setAlarmSoundEnabled(enabled: boolean) {
+  localStorage.setItem(SOUND_PREFERENCE, enabled ? 'on' : 'off');
+}
+export function isAlarmSoundReady() { return audio?.state === 'running'; }
 export async function enableAlarmSound() {
-  audio ??= new AudioContext();
+  if (!audio || audio.state === 'closed') audio = new AudioContext();
   await audio.resume();
-  if (audio.state !== 'running') throw new Error('Tap again to allow alarm sound in this session.');
+  if (audio.state !== 'running') throw new Error('Sound is saved as on. Tap the sound control to allow audio playback.');
 }
-function tone() {
+function alarmPattern() {
   if (!audio || audio.state !== 'running' || document.visibilityState !== 'visible') return;
-  const oscillator = audio.createOscillator();
-  const volume = audio.createGain();
+  // A clear, repeating two-note signal with soft edges to avoid clicks.
+  // Pulses never overlap, keeping the level controlled at higher device volume.
   const start = audio.currentTime;
-  oscillator.type = 'sine'; oscillator.frequency.value = 660;
-  volume.gain.setValueAtTime(0, start); volume.gain.linearRampToValueAtTime(0.12, start + 0.02); volume.gain.exponentialRampToValueAtTime(0.001, start + 0.7);
-  oscillator.connect(volume); volume.connect(audio.destination);
-  oscillator.start(start); oscillator.stop(start + 0.75);
-  oscillator.onended = () => { oscillator.disconnect(); volume.disconnect(); };
+  [740, 988, 740, 988].forEach((frequency, index) => {
+    const oscillator = audio!.createOscillator();
+    const volume = audio!.createGain();
+    const at = start + index * 0.26;
+    oscillator.type = 'triangle';
+    oscillator.frequency.value = frequency;
+    volume.gain.setValueAtTime(0, at);
+    volume.gain.linearRampToValueAtTime(0.32, at + 0.015);
+    volume.gain.setValueAtTime(0.32, at + 0.14);
+    volume.gain.exponentialRampToValueAtTime(0.001, at + 0.22);
+    oscillator.connect(volume); volume.connect(audio!.destination);
+    sounding.add(oscillator);
+    oscillator.onended = () => { sounding.delete(oscillator); oscillator.disconnect(); volume.disconnect(); };
+    oscillator.start(at); oscillator.stop(at + 0.23);
+  });
 }
-export function stopAlarmSound() { clearInterval(audioTimer); clearTimeout(audioStop); }
+export function stopAlarmSound() {
+  clearInterval(audioTimer); clearTimeout(audioStop);
+  for (const oscillator of sounding) { try { oscillator.stop(); } catch { /* Already ended. */ } }
+  sounding.clear();
+}
 export function playAlarmSound() {
-  stopAlarmSound(); tone();
-  audioTimer = setInterval(tone, 3000);
+  stopAlarmSound(); alarmPattern();
+  audioTimer = setInterval(alarmPattern, 2400);
   audioStop = setTimeout(stopAlarmSound, 60_000);
 }
-export function previewAlarmSound() { tone(); }
+export function previewAlarmSound() { stopAlarmSound(); alarmPattern(); }
 export function notificationBody(title: string, showTitles: boolean) { return showTitles ? title : GENERIC; }

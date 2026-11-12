@@ -8,12 +8,12 @@ import { activeReminders, backgroundReminders, needsReminderStatusRefresh, remin
 import type { NotificationInfo, ReminderStatus, RemoteReminder, RemoteStatus } from './types';
 
 type ReminderContext = {
-  info: NotificationInfo | null; online: boolean; syncError: string; busy: boolean; soundEnabled: boolean;
+  info: NotificationInfo | null; online: boolean; syncError: string; busy: boolean; soundEnabled: boolean; soundReady: boolean;
   activeTask: Todo | null; openTaskId: string | null;
   status: (todo: Todo) => ReminderStatus | undefined;
   connect: () => Promise<void>; disconnect: () => Promise<void>; test: () => Promise<void>;
   privacy: (show: boolean) => Promise<void>; retry: () => void; dismiss: () => void; snooze: () => Promise<void>;
-  enableSound: () => Promise<void>; disableSound: () => void; previewSound: () => void; consumeOpenTask: () => void;
+  enableSound: () => Promise<void>; disableSound: () => void; previewSound: () => Promise<void>; consumeOpenTask: () => void;
 };
 const Context = createContext<ReminderContext | null>(null);
 export function RemindersProvider({ children }: PropsWithChildren) {
@@ -23,7 +23,31 @@ export function RemindersProvider({ children }: PropsWithChildren) {
   const [online, setOnline] = useState(true);
   const [syncError, setSyncError] = useState('');
   const [busy, setBusy] = useState(false);
-  const [soundEnabled, setSoundEnabled] = useState(false);
+  const [soundEnabled, setSoundEnabled] = useState(notifications.alarmSoundEnabled);
+  const [soundReady, setSoundReady] = useState(false);
+  useEffect(() => {
+    if (Platform.OS !== 'web' || !soundEnabled) return;
+    let cancelled = false;
+    const activate = () => {
+      if (document.visibilityState !== 'visible') return;
+      void notifications.enableAlarmSound().then(() => { if (!cancelled) setSoundReady(notifications.isAlarmSoundReady()); }).catch(() => { if (!cancelled) setSoundReady(false); });
+    };
+    const visibility = () => {
+      setSoundReady(notifications.isAlarmSoundReady());
+      if (document.visibilityState === 'visible') activate();
+    };
+    // Saved intent survives closing the app; a normal tap can unlock browser audio.
+    document.addEventListener('pointerdown', activate, true);
+    document.addEventListener('keydown', activate, true);
+    document.addEventListener('visibilitychange', visibility);
+    activate();
+    return () => {
+      cancelled = true;
+      document.removeEventListener('pointerdown', activate, true);
+      document.removeEventListener('keydown', activate, true);
+      document.removeEventListener('visibilitychange', visibility);
+    };
+  }, [soundEnabled]);
   const [active, setActive] = useState<{ id: string; reminderAt: string } | null>(null);
   const [openTaskId, setOpenTaskId] = useState<string | null>(null);
   const [desired, setDesired] = useState<RemoteReminder[]>([]);
@@ -37,7 +61,6 @@ export function RemindersProvider({ children }: PropsWithChildren) {
   const latestAcknowledged = useRef<RemoteStatus[]>([]);
   const source = useRef({ todos, unlocked: false, sound: false, active: null as typeof active });
   const presenting = useRef(false);
-  const received = useRef(new Set<string>());
   const isForeground = () => Platform.OS === 'web' ? document.visibilityState === 'visible' : AppState.currentState === 'active';
 
   const refreshInfo = useCallback(async () => {
@@ -104,7 +127,7 @@ export function RemindersProvider({ children }: PropsWithChildren) {
   }, [refreshInfo]);
 
   useEffect(() => {
-    const present = async (task: Todo, pushed: boolean) => {
+    const present = async (task: Todo) => {
       if (presenting.current || !source.current.unlocked || !isForeground() || !task.reminderAt) return false;
       const currentActive = source.current.active;
       if (currentActive && source.current.todos.some((item) => item.id === currentActive.id && !item.completed && item.reminderAt === currentActive.reminderAt)) return false;
@@ -116,7 +139,7 @@ export function RemindersProvider({ children }: PropsWithChildren) {
         if (!source.current.unlocked || !isForeground() || !source.current.todos.some((item) => item.id === task.id && !item.completed && item.reminderAt === task.reminderAt)) return false;
         source.current.active = { id: task.id, reminderAt: task.reminderAt };
         setActive({ id: task.id, reminderAt: task.reminderAt });
-        if (source.current.sound && !pushed && !received.current.has(key)) notifications.playAlarmSound();
+        if (source.current.sound) notifications.playAlarmSound();
         return true;
       } catch { return false; }
       finally { presenting.current = false; }
@@ -125,13 +148,13 @@ export function RemindersProvider({ children }: PropsWithChildren) {
       if (!source.current.unlocked || !isForeground()) return;
       const now = Date.now();
       const tasks = activeReminders(source.current.todos, now).filter((item) => Date.parse(item.reminderAt!) <= now).sort((a, b) => Date.parse(a.reminderAt!) - Date.parse(b.reminderAt!));
-      void (async () => { for (const task of tasks) if (await present(task, false)) break; })();
+      void (async () => { for (const task of tasks) if (await present(task)) break; })();
     };
     const timer = setInterval(tick, 2000);
     const unsubscribe = notifications.notificationEvents((event) => {
       if (event.type === 'open') { setOpenTaskId(event.taskId); return; }
       const task = source.current.todos.find((item) => item.id === event.taskId && !item.completed && item.reminderAt === event.reminderAt);
-      if (task) { received.current.add(reminderKey(task)); void present(task, true); }
+      if (task) void present(task);
     });
     return () => { clearInterval(timer); unsubscribe(); notifications.stopAlarmSound(); };
   }, []);
@@ -163,12 +186,13 @@ export function RemindersProvider({ children }: PropsWithChildren) {
     return syncError && online ? 'failed' : 'pending';
   };
 
-  return <Context.Provider value={{ info, online, syncError, busy, soundEnabled, activeTask, openTaskId, status,
+  return <Context.Provider value={{ info, online, syncError, busy, soundEnabled, soundReady, activeTask, openTaskId, status,
     connect: () => action(() => notifications.connectNotifications()), disconnect: () => action(() => notifications.disconnectNotifications()),
     test: () => action(() => notifications.testNotification()), privacy: (show) => action(() => notifications.setNotificationPrivacy(show)),
     retry: () => { ackFingerprint.current = ''; setRetry((value) => Math.max(Date.now(), value + 1)); }, dismiss, snooze,
-    enableSound: async () => { await notifications.enableAlarmSound(); setSoundEnabled(true); notifications.previewAlarmSound(); },
-    disableSound: () => { notifications.stopAlarmSound(); setSoundEnabled(false); }, previewSound: notifications.previewAlarmSound,
+    enableSound: async () => { notifications.setAlarmSoundEnabled(true); setSoundEnabled(true); await notifications.enableAlarmSound(); setSoundReady(notifications.isAlarmSoundReady()); if (notifications.alarmSoundEnabled()) notifications.previewAlarmSound(); },
+    disableSound: () => { notifications.setAlarmSoundEnabled(false); notifications.stopAlarmSound(); setSoundEnabled(false); setSoundReady(false); },
+    previewSound: async () => { await notifications.enableAlarmSound(); setSoundReady(notifications.isAlarmSoundReady()); if (notifications.alarmSoundEnabled()) notifications.previewAlarmSound(); },
     consumeOpenTask: () => setOpenTaskId(null),
   }}>{children}</Context.Provider>;
 }

@@ -37,6 +37,9 @@ export function notificationEvents(handler: (event: ReminderEvent) => void) {
   if (last) response(last);
   return () => subscription.remove();
 }
+export function alarmSoundEnabled() { return false; }
+export function setAlarmSoundEnabled(_enabled: boolean) { /* Web alarm preference only. */ }
+export function isAlarmSoundReady() { return false; }
 export async function enableAlarmSound() { /* Native notifications control their own audio. */ }
 export function playAlarmSound() { /* Native notifications control their own audio. */ }
 export function stopAlarmSound() { /* Native notifications control their own audio. */ }
