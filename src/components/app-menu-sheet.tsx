@@ -20,11 +20,13 @@ import { ThemeColors, useThemeStyles } from '@/theme/theme';
 type AppMenuSheetProps = {
   onClose: () => void;
   pastDateCount?: number;
+  upcomingDateCount?: number;
 };
 
 export function AppMenuSheet({
   onClose,
   pastDateCount = 0,
+  upcomingDateCount = 0,
 }: AppMenuSheetProps) {
   const styles = useThemeStyles(createStyles);
   const insets = useSafeAreaInsets();
@@ -51,7 +53,7 @@ export function AppMenuSheet({
     ]).start();
   }, [backdropOpacity, preferences.reducedMotion, translateY]);
 
-  const dismiss = (destination?: '/defaults' | '/history' | '/settings') => {
+  const dismiss = (destination?: '/defaults' | '/history' | '/settings' | '/upcoming') => {
     if (closingRef.current) return;
     closingRef.current = true;
 
@@ -74,7 +76,7 @@ export function AppMenuSheet({
     });
   };
 
-  const navigate = (destination: '/defaults' | '/history' | '/settings') => {
+  const navigate = (destination: '/defaults' | '/history' | '/settings' | '/upcoming') => {
     feedback.selection();
     dismiss(destination);
   };
@@ -113,6 +115,24 @@ export function AppMenuSheet({
             <Text style={styles.title}>More</Text>
 
             <View style={styles.actionList}>
+              {upcomingDateCount ? (
+                <Pressable
+                  accessibilityLabel={`Open upcoming tasks. ${upcomingDateCount} ${upcomingDateCount === 1 ? 'day' : 'days'} scheduled.`}
+                  accessibilityRole="button"
+                  onPress={() => navigate('/upcoming')}
+                  style={({ pressed }) => [styles.actionRow, pressed && styles.pressed]}
+                >
+                  <UpcomingIcon />
+                  <View style={styles.actionCopy}>
+                    <Text style={styles.actionText}>Upcoming</Text>
+                    <Text style={styles.actionMeta}>
+                      {upcomingDateCount} {upcomingDateCount === 1 ? 'scheduled day' : 'scheduled days'}
+                    </Text>
+                  </View>
+                  <Text style={styles.arrow}>→</Text>
+                </Pressable>
+              ) : null}
+
               {pastDateCount ? (
                 <Pressable
                   accessibilityLabel={`Open past tasks. ${pastDateCount} saved ${pastDateCount === 1 ? 'day' : 'days'}.`}
@@ -199,6 +219,18 @@ function HistoryIcon() {
       <View style={styles.historyPage} />
       <View style={[styles.historyLine, styles.historyLineTop]} />
       <View style={[styles.historyLine, styles.historyLineBottom]} />
+    </View>
+  );
+}
+
+function UpcomingIcon() {
+  const styles = useThemeStyles(createStyles);
+  return (
+    <View style={styles.icon}>
+      <View style={styles.historyPage} />
+      <View style={[styles.historyLine, styles.historyLineTop]} />
+      <View style={[styles.historyLine, styles.historyLineBottom]} />
+      <View style={styles.upcomingDot} />
     </View>
   );
 }
@@ -302,6 +334,14 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   icon: {
     width: 14,
     height: 14,
+  },
+  upcomingDot: {
+    position: 'absolute',
+    width: 5,
+    height: 5,
+    right: -2,
+    bottom: -1,
+    backgroundColor: colors.accent,
   },
   historyPage: {
     position: 'absolute',

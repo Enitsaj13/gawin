@@ -27,6 +27,9 @@ export default function HistoryScreen() {
   const pastDates = [...new Set(todos.map((todo) => todo.date))]
     .filter((date) => date < today)
     .sort((first, second) => second.localeCompare(first));
+  const upcomingDateCount = new Set(
+    todos.filter((todo) => todo.date > today).map((todo) => todo.date),
+  ).size;
   const normalizedQuery = query.trim().toLocaleLowerCase();
   const matchingTodos = (date: string) =>
     getTodosForDate(date).filter(
@@ -126,7 +129,12 @@ export default function HistoryScreen() {
           </View>
         )}
       </View>
-      {menuOpen ? <AppMenuSheet onClose={() => setMenuOpen(false)} /> : null}
+      {menuOpen ? (
+        <AppMenuSheet
+          onClose={() => setMenuOpen(false)}
+          upcomingDateCount={upcomingDateCount}
+        />
+      ) : null}
     </SafeAreaView>
   );
 }

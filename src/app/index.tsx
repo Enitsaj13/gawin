@@ -96,6 +96,9 @@ export default function HomeScreen() {
   const pastDateCount = new Set(
     todos.filter((todo) => todo.date < today).map((todo) => todo.date),
   ).size;
+  const upcomingDateCount = new Set(
+    todos.filter((todo) => todo.date > today).map((todo) => todo.date),
+  ).size;
 
   const nextCompletionMessage = () => {
     if (!completionMessages.current.length) {
@@ -238,18 +241,21 @@ export default function HomeScreen() {
           allowSeriesUpdate={
             composer.mode === 'edit' && isTodoRepeating(composer.todo)
           }
-          date={today}
+          allowDateSelection={
+            composer.mode !== 'edit' || !isTodoRepeating(composer.todo)
+          }
+          date={composer.mode === 'edit' ? composer.todo.date : today}
           heading={composer.mode === 'edit' ? 'Edit task' : 'New task'}
           initialTitle={composer.mode === 'edit' ? composer.todo.title : ''}
           key={composer.mode === 'edit' ? composer.todo.id : 'new-task'}
           onClose={() => setComposer(null)}
-          onSubmit={(title, updateSeries) => {
+          onSubmit={(title, selectedDate, updateSeries) => {
             if (composer.mode === 'edit') {
-              editTodo(composer.todo.id, title, updateSeries);
+              editTodo(composer.todo.id, title, updateSeries, selectedDate);
               return;
             }
 
-            addTodo(title, today);
+            addTodo(title, selectedDate);
           }}
           submitLabel={composer.mode === 'edit' ? 'Save changes' : 'Add task'}
           visible
@@ -268,6 +274,7 @@ export default function HomeScreen() {
       {menuOpen ? (
         <AppMenuSheet
           onClose={() => setMenuOpen(false)}
+          upcomingDateCount={upcomingDateCount}
           pastDateCount={pastDateCount}
         />
       ) : null}

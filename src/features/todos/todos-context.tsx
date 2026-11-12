@@ -54,7 +54,7 @@ type TodosContextValue = {
   deleteDailyDefault: (id: string) => void;
   duplicateTodo: (id: string) => void;
   editDailyDefault: (id: string, title: string) => void;
-  editTodo: (id: string, title: string, updateSeries?: boolean) => void;
+  editTodo: (id: string, title: string, updateSeries?: boolean, date?: string) => void;
   getTodosForDate: (date: string) => Todo[];
   getRepeatDays: (todo: Todo) => number[] | null;
   isTodoRepeating: (todo: Todo) => boolean;
@@ -567,14 +567,16 @@ export function TodosProvider({ children }: PropsWithChildren) {
   );
 
   const editTodo = useCallback(
-    (id: string, title: string, updateSeries = false) => {
+    (id: string, title: string, updateSeries = false, date?: string) => {
       const cleanTitle = title.trim();
       if (!cleanTitle) return;
 
       const editedTodo = todos.find((todo) => todo.id === id);
       setTodos((current) =>
         current.map((todo) =>
-          todo.id === id ? { ...todo, title: cleanTitle } : todo,
+          todo.id === id
+            ? { ...todo, title: cleanTitle, ...(date ? { date } : {}) }
+            : todo,
         ),
       );
 

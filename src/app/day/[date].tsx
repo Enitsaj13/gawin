@@ -150,13 +150,14 @@ export default function DayScreen() {
       {editingTodo ? (
         <TaskComposer
           allowSeriesUpdate={isTodoRepeating(editingTodo)}
-          date={date}
+          allowDateSelection={!isTodoRepeating(editingTodo)}
+          date={editingTodo.date}
           heading="Edit task"
           initialTitle={editingTodo.title}
           key={editingTodo.id}
           onClose={() => setEditingTodo(null)}
-          onSubmit={(title, updateSeries) =>
-            editTodo(editingTodo.id, title, updateSeries)
+          onSubmit={(title, selectedDate, updateSeries) =>
+            editTodo(editingTodo.id, title, updateSeries, selectedDate)
           }
           submitLabel="Save changes"
           visible

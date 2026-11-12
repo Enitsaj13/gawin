@@ -124,6 +124,7 @@ export default function DailyDefaultsScreen() {
 
       {composer ? (
         <TaskComposer
+          allowDateSelection={false}
           date={today}
           heading={
             composer.mode === 'edit' ? 'Edit daily default' : 'New daily default'

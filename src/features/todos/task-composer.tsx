@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
+  Keyboard,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -11,18 +12,19 @@ import {
 } from 'react-native';
 import type { ViewStyle } from 'react-native';
 
-import { formatJournalDate } from '@/lib/date';
+import { formatJournalDate, fromDateKey, todayKey, toDateKey } from '@/lib/date';
 import { ThemeColors, useAppTheme, useThemeStyles } from '@/theme/theme';
 
 type TaskComposerProps = {
   allowSeriesUpdate?: boolean;
+  allowDateSelection?: boolean;
   date: string;
   heading?: string;
   initialTitle?: string;
   submitLabel?: string;
   visible: boolean;
   onClose: () => void;
-  onSubmit: (title: string, updateSeries: boolean) => void;
+  onSubmit: (title: string, date: string, updateSeries: boolean) => void;
 };
 
 type WebViewport = {
@@ -38,6 +40,7 @@ const webScrollLockStyle: ViewStyle & { touchAction: 'none' } = {
 
 export function TaskComposer({
   allowSeriesUpdate = false,
+  allowDateSelection = true,
   date,
   heading = 'New task',
   initialTitle = '',
@@ -49,9 +52,30 @@ export function TaskComposer({
   const styles = useThemeStyles(createStyles);
   const { colors } = useAppTheme();
   const [title, setTitle] = useState(initialTitle);
+  const [selectedDate, setSelectedDate] = useState(date);
+  const [calendarOpen, setCalendarOpen] = useState(false);
+  const [visibleMonth, setVisibleMonth] = useState(() => fromDateKey(date));
   const [updateSeries, setUpdateSeries] = useState(false);
   const [inputFocused, setInputFocused] = useState(false);
   const [webViewport, setWebViewport] = useState<WebViewport | null>(null);
+  const calendarDays = useMemo(() => {
+    const firstDay = new Date(visibleMonth.getFullYear(), visibleMonth.getMonth(), 1, 12);
+    const offset = firstDay.getDay();
+    const dayCount = new Date(visibleMonth.getFullYear(), visibleMonth.getMonth() + 1, 0, 12).getDate();
+    const count = Math.ceil((offset + dayCount) / 7) * 7;
+    return Array.from({ length: count }, (_, index) => {
+      const day = index - offset + 1;
+      return day > 0 && day <= dayCount
+        ? toDateKey(new Date(visibleMonth.getFullYear(), visibleMonth.getMonth(), day, 12))
+        : null;
+    });
+  }, [visibleMonth]);
+  const currentDate = todayKey();
+  const currentMonth = fromDateKey(currentDate);
+  const canGoToPreviousMonth =
+    visibleMonth.getFullYear() > currentMonth.getFullYear() ||
+    (visibleMonth.getFullYear() === currentMonth.getFullYear() &&
+      visibleMonth.getMonth() > currentMonth.getMonth());
 
   useEffect(() => {
     if (Platform.OS !== 'web' || typeof window === 'undefined') return;
@@ -85,7 +109,7 @@ export function TaskComposer({
 
   const submit = () => {
     if (!title.trim()) return;
-    onSubmit(title, updateSeries);
+    onSubmit(title, selectedDate, updateSeries);
     close();
   };
 
@@ -130,7 +154,7 @@ export function TaskComposer({
             style={StyleSheet.absoluteFill}
           />
           <View style={styles.sheet}>
-            <Text style={styles.eyebrow}>{formatJournalDate(date)}</Text>
+            <Text style={styles.eyebrow}>{formatJournalDate(selectedDate)}</Text>
             <Text style={styles.title}>{heading}</Text>
             <TextInput
               accessibilityLabel="Task title"
@@ -154,6 +178,73 @@ export function TaskComposer({
               ]}
               value={title}
             />
+            {allowDateSelection ? (
+              <View style={styles.datePicker}>
+                <Pressable
+                  accessibilityLabel={`Task date: ${formatJournalDate(selectedDate)}. Tap to choose a date.`}
+                  accessibilityRole="button"
+                  accessibilityState={{ expanded: calendarOpen }}
+                  onPress={() => {
+                    setCalendarOpen((open) => !open);
+                    if (!calendarOpen) {
+                      setVisibleMonth(fromDateKey(selectedDate));
+                      Keyboard.dismiss();
+                    }
+                  }}
+                  style={({ pressed }) => [styles.dateButton, pressed && styles.pressed]}
+                >
+                  <View>
+                    <Text style={styles.dateLabel}>DATE</Text>
+                    <Text style={styles.dateValue}>
+                      {selectedDate === todayKey() ? 'Today' : formatJournalDate(selectedDate)}
+                    </Text>
+                  </View>
+                  <Text style={styles.dateChevron}>{calendarOpen ? '−' : '+'}</Text>
+                </Pressable>
+                {calendarOpen ? (
+                  <View style={styles.calendar}>
+                    <View style={styles.calendarHeader}>
+                      <Pressable
+                        accessibilityLabel="Previous month"
+                        accessibilityRole="button"
+                        accessibilityState={{ disabled: !canGoToPreviousMonth }}
+                        disabled={!canGoToPreviousMonth}
+                        onPress={() => setVisibleMonth((month) => new Date(month.getFullYear(), month.getMonth() - 1, 1, 12))}
+                        style={[styles.monthArrowHit, !canGoToPreviousMonth && styles.monthArrowDisabled]}
+                      ><Text style={[styles.monthArrow, !canGoToPreviousMonth && styles.monthArrowDisabledText]}>‹</Text></Pressable>
+                      <Text style={styles.monthTitle}>{visibleMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</Text>
+                      <Pressable
+                        accessibilityLabel="Next month"
+                        accessibilityRole="button"
+                        onPress={() => setVisibleMonth((month) => new Date(month.getFullYear(), month.getMonth() + 1, 1, 12))}
+                        style={styles.monthArrowHit}
+                      ><Text style={styles.monthArrow}>›</Text></Pressable>
+                    </View>
+                    <View style={styles.calendarGrid}>
+                      {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, index) => (
+                        <Text key={`${day}-${index}`} style={styles.weekdayCell}>{day}</Text>
+                      ))}
+                      {calendarDays.map((day, index) => day ? (
+                        <Pressable
+                          accessibilityLabel={`${formatJournalDate(day)}${day < currentDate ? ', unavailable' : ''}`}
+                          accessibilityRole={day < currentDate ? undefined : 'button'}
+                          accessibilityState={{ disabled: day < currentDate, selected: day === selectedDate }}
+                          disabled={day < currentDate}
+                          key={day}
+                          onPress={() => { setSelectedDate(day); setCalendarOpen(false); }}
+                          style={({ pressed }) => [styles.dayCell, day < currentDate && styles.pastDay, day === selectedDate && styles.selectedDay, pressed && styles.pressed]}
+                        ><Text style={[styles.dayText, day < currentDate && styles.pastDayText, day === selectedDate && styles.selectedDayText]}>{fromDateKey(day).getDate()}</Text></Pressable>
+                      ) : <View key={`blank-${index}`} style={styles.dayCell} />)}
+                    </View>
+                    <Pressable
+                      accessibilityRole="button"
+                      onPress={() => { setSelectedDate(todayKey()); setVisibleMonth(fromDateKey(todayKey())); setCalendarOpen(false); }}
+                      style={({ pressed }) => [styles.todayShortcut, pressed && styles.pressed]}
+                    ><Text style={styles.todayShortcutText}>Today</Text></Pressable>
+                  </View>
+                ) : null}
+              </View>
+            ) : null}
             {allowSeriesUpdate ? (
               <View style={styles.scopePicker}>
                 <Text style={styles.scopeLabel}>Apply changes to</Text>
@@ -278,6 +369,116 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   },
   inputWebFocused: {
     borderBottomWidth: 2,
+  },
+  datePicker: {
+    marginTop: 18,
+  },
+  dateButton: {
+    minHeight: 48,
+    paddingVertical: 8,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.borderStrong,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  dateLabel: {
+    color: colors.textMuted,
+    fontFamily: 'SpaceMono_400Regular',
+    fontSize: 9,
+    letterSpacing: 1,
+  },
+  dateValue: {
+    marginTop: 2,
+    color: colors.text,
+    fontFamily: 'SpaceMono_700Bold',
+    fontSize: 12,
+  },
+  dateChevron: {
+    color: colors.textSecondary,
+    fontFamily: 'SpaceMono_400Regular',
+    fontSize: 20,
+  },
+  calendar: {
+    marginTop: 14,
+    paddingHorizontal: 4,
+  },
+  calendarHeader: {
+    minHeight: 38,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  monthTitle: {
+    color: colors.text,
+    fontFamily: 'SpaceMono_700Bold',
+    fontSize: 12,
+  },
+  monthArrowHit: {
+    width: 40,
+    height: 38,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  monthArrowDisabled: {
+    opacity: 0.35,
+  },
+  monthArrowDisabledText: {
+    color: colors.textFaint,
+  },
+  monthArrow: {
+    color: colors.textSecondary,
+    fontFamily: 'SpaceMono_400Regular',
+    fontSize: 23,
+  },
+  calendarGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  weekdayCell: {
+    width: '14.2857%',
+    height: 32,
+    color: colors.textMuted,
+    fontFamily: 'SpaceMono_400Regular',
+    fontSize: 9,
+    textAlign: 'center',
+    textAlignVertical: 'center',
+  },
+  dayCell: {
+    width: '14.2857%',
+    height: 38,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  selectedDay: {
+    backgroundColor: colors.accent,
+  },
+  dayText: {
+    color: colors.textSecondary,
+    fontFamily: 'SpaceMono_400Regular',
+    fontSize: 11,
+  },
+  pastDay: {
+    opacity: 0.38,
+  },
+  pastDayText: {
+    color: colors.textFaint,
+  },
+  selectedDayText: {
+    color: colors.accentText,
+    fontFamily: 'SpaceMono_700Bold',
+  },
+  todayShortcut: {
+    alignSelf: 'flex-end',
+    minHeight: 36,
+    justifyContent: 'center',
+    paddingHorizontal: 10,
+  },
+  todayShortcutText: {
+    color: colors.textSecondary,
+    fontFamily: 'SpaceMono_700Bold',
+    fontSize: 10,
+    textDecorationLine: 'underline',
   },
   actions: {
     marginTop: 24,
