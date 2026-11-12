@@ -115,13 +115,9 @@ export function AppMenuSheet({
         >
           <View style={styles.content}>
             <Text style={styles.eyebrow}>Gawin</Text>
-            <Text style={styles.title}>More</Text>
+            <Text style={styles.title}>Menu</Text>
 
             <View style={styles.actionList}>
-              <Pressable accessibilityRole="button" accessibilityLabel="Open Clock" onPress={() => navigate('/clock')} style={({ pressed }) => [styles.actionRow, pressed && styles.pressed]}>
-                <Svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke={colors.textSecondary} strokeWidth={1.5} aria-hidden={true} focusable={false}><Circle cx={12} cy={12} r={9} /><Path d="M12 6v6l4 2" /></Svg>
-                <View style={styles.actionCopy}><Text style={styles.actionText}>Clock</Text><Text style={styles.actionMeta}>The time, and what’s next</Text></View><Text style={styles.arrow}>→</Text>
-              </Pressable>
               {upcomingDateCount ? (
                 <Pressable
                   accessibilityLabel={`Open upcoming tasks. ${upcomingDateCount} ${upcomingDateCount === 1 ? 'day' : 'days'} scheduled.`}
@@ -179,6 +175,11 @@ export function AppMenuSheet({
                   </Text>
                 </View>
                 <Text style={styles.arrow}>→</Text>
+              </Pressable>
+
+              <Pressable accessibilityRole="button" accessibilityLabel="Open Clock" onPress={() => navigate('/clock')} style={({ pressed }) => [styles.actionRow, pressed && styles.pressed]}>
+                <Svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke={colors.textSecondary} strokeWidth={1.5} aria-hidden={true} focusable={false}><Circle cx={12} cy={12} r={9} /><Path d="M12 6v6l4 2" /></Svg>
+                <View style={styles.actionCopy}><Text style={styles.actionText}>Clock</Text><Text style={styles.actionMeta}>The time, and what’s next</Text></View><Text style={styles.arrow}>→</Text>
               </Pressable>
 
               <Pressable

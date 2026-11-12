@@ -4,7 +4,7 @@ import { registerHooks } from 'node:module';
 import { existsSync } from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { resolve, dirname } from 'node:path';
-import { activeReminders, backgroundReminders, moveTaskDate, needsReminderStatusRefresh, nextTimedTask, resolveSchedule, scheduledInstant } from '../src/features/reminders/schedule.ts';
+import { activeReminders, backgroundReminders, moveTaskDate, needsReminderStatusRefresh, nextTimedTask, quickReminderOptions, resolveSchedule, scheduledInstant } from '../src/features/reminders/schedule.ts';
 
 registerHooks({ resolve(specifier, context, next) {
   if (specifier.startsWith('@/')) return next(new URL(`../src/${specifier.slice(2)}.ts`, import.meta.url).href, context);
@@ -79,4 +79,21 @@ test('delivery status polling waits until due and stops when the matching schedu
   assert.equal(needsReminderStatusRefresh(desired, [{ ...desired[0], status: 'failed' }], 10_000), false);
   assert.equal(needsReminderStatusRefresh(desired, [{ ...desired[0], version: 'old', status: 'sent' }], 10_000), true);
   assert.equal(needsReminderStatusRefresh([], [], 10_000), false);
+});
+
+test('untimed quick reminders use honest labels and chronological future dates after midnight approaches', () => {
+  const now = new Date(2026, 10, 12, 23, 30).getTime();
+  const options = quickReminderOptions(undefined, now);
+  assert.deepEqual(options.map((item) => item.label), ['In 1 hour', 'Tomorrow morning']);
+  assert.equal(options[0].dueAt, now + 3600000);
+  assert.equal(new Date(options[1].dueAt).getHours(), 9);
+  assert.equal(new Date(options[1].dueAt).getDate(), 13);
+  assert.ok(options.every((item) => item.dueAt > now));
+});
+test('timed quick reminders use the task instant and exclude passed offsets', () => {
+  const now = Date.parse('2026-11-12T12:00:00Z');
+  const start = new Date(now + 10 * 60000).toISOString();
+  assert.deepEqual(quickReminderOptions(start, now).map((item) => item.dueAt), [now + 10 * 60000, now + 5 * 60000]);
+  assert.deepEqual(quickReminderOptions(start, now + 6 * 60000).map((item) => item.label), ['At start']);
+  assert.deepEqual(quickReminderOptions(start, now + 10 * 60000), []);
 });

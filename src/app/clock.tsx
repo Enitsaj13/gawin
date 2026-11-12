@@ -48,11 +48,13 @@ export default function ClockScreen() {
             if (reminders.soundEnabled) { try { reminders.disableSound(); } catch { setMessage('Sound preference could not be saved. Please try again.'); } }
             else void reminders.enableSound().catch((error) => setMessage(error instanceof Error ? error.message : 'Sound could not start. Please try again.'));
           }} style={styles.soundRow}><Text style={styles.soundTitle}>Alarm sound</Text><Text style={styles.soundValue}>{reminders.soundEnabled ? 'On' : 'Off'} →</Text></Pressable>
-          <Text style={styles.note}>Hear reminders while Gawin is open. Sound stays on until you turn it off.</Text>
-          <Text style={styles.note}>Turn it on to hear a preview. Adjust your phone’s media volume for a clearer alert, then dismiss or snooze the reminder to stop the sound.</Text>
+          <Text style={styles.note}>Hear reminders while Gawin is open. Your sound preference stays saved.</Text>
+          <Text style={styles.note}>Adjust your media volume, then dismiss or snooze to stop the alarm.</Text>
           {reminders.soundEnabled && !reminders.soundReady ? <Pressable accessibilityRole="button" onPress={() => { setMessage(''); void reminders.previewSound().catch((error) => setMessage(error instanceof Error ? error.message : 'Tap again to allow audio playback.')); }} style={styles.test}><Text style={styles.link}>Tap to enable sound</Text></Pressable> : null}
           {message ? <Text accessibilityLiveRegion="polite" style={styles.note}>{message}</Text> : null}
         </View> : null}
+        <Pressable accessibilityRole="button" onPress={() => router.push('/settings')} style={styles.settings}><Text style={styles.link}>Notification settings →</Text></Pressable>
+        <Text style={styles.note}>Manage reminders when Gawin is closed. Choose whether notifications show your task titles.</Text>
         {upcoming.length > 1 ? <View style={styles.upcoming}>
           <Text style={styles.eyebrow}>Coming up</Text>
           {upcoming.slice(1).map((task) => <Pressable accessibilityRole="button" key={task.id} onPress={() => router.push({ pathname: '/task/[id]', params: { id: task.id } })} style={styles.upcomingRow}>
@@ -60,9 +62,6 @@ export default function ClockScreen() {
           </Pressable>)}
         </View> : null}
       </ScrollView>
-      <View style={styles.footer}>
-        <Pressable accessibilityRole="button" onPress={() => router.push('/settings')} style={styles.settings}><Text style={styles.link}>Notification settings →</Text></Pressable>
-      </View>
     </View>
   </SafeAreaView>;
 }
@@ -72,5 +71,5 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   clock: { alignItems: 'center', paddingTop: 12, paddingBottom: 26 }, date: { fontFamily: 'SpaceMono_400Regular', fontSize: 11, color: colors.textMuted }, digits: { fontFamily: 'SpaceMono_700Bold', fontSize: 44, letterSpacing: -2, color: colors.text, marginTop: 12 }, zone: { fontFamily: 'SpaceMono_400Regular', fontSize: 9, color: colors.textMuted, marginTop: 8 },
   eyebrow: { fontFamily: 'SpaceMono_700Bold', fontSize: 9, textTransform: 'uppercase', letterSpacing: 0.7, color: colors.textMuted }, next: { paddingVertical: 16, borderBottomWidth: 1, borderColor: colors.border }, nextTitle: { fontFamily: 'SpaceMono_700Bold', fontSize: 18, lineHeight: 26, color: colors.text }, nextTime: { fontFamily: 'SpaceMono_400Regular', fontSize: 10, lineHeight: 18, color: colors.textSecondary, marginTop: 8 }, countdown: { fontFamily: 'SpaceMono_400Regular', fontSize: 10, color: colors.textMuted, marginTop: 10 },
   soundSection: { paddingTop: 12 }, soundRow: { minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }, soundTitle: { fontFamily: 'SpaceMono_700Bold', fontSize: 11, color: colors.textSecondary }, soundValue: { fontFamily: 'SpaceMono_400Regular', fontSize: 9, color: colors.textMuted }, note: { fontFamily: 'SpaceMono_400Regular', fontSize: 9, color: colors.textMuted, lineHeight: 17, marginTop: 6 }, test: { minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start' }, link: { fontFamily: 'SpaceMono_400Regular', fontSize: 10, color: colors.textSecondary, textDecorationLine: 'underline' },
-  upcoming: { marginTop: 22 }, upcomingRow: { minHeight: 64, justifyContent: 'center', borderBottomWidth: 1, borderColor: colors.border }, upcomingTitle: { fontFamily: 'SpaceMono_400Regular', fontSize: 12, color: colors.textSecondary }, upcomingTime: { fontFamily: 'SpaceMono_400Regular', fontSize: 9, color: colors.textMuted, marginTop: 5 }, footer: { flexShrink: 0, paddingHorizontal: 24, paddingVertical: 4, borderTopWidth: StyleSheet.hairlineWidth, borderColor: colors.border }, settings: { minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start' },
+  upcoming: { marginTop: 22 }, upcomingRow: { minHeight: 64, justifyContent: 'center', borderBottomWidth: 1, borderColor: colors.border }, upcomingTitle: { fontFamily: 'SpaceMono_400Regular', fontSize: 12, color: colors.textSecondary }, upcomingTime: { fontFamily: 'SpaceMono_400Regular', fontSize: 9, color: colors.textMuted, marginTop: 5 }, settings: { marginTop: 8, minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start' },
 });

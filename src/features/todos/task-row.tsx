@@ -316,6 +316,7 @@ export function TaskRow({
           initialMode={actionSheetMode}
           isRepeating={isRepeating}
           reminderAt={todo.reminderAt}
+          scheduledAt={todo.scheduledAt}
           repeatDays={repeatDays}
           onClose={() => setActionSheetMode(null)}
           onClearReminder={

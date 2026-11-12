@@ -82,3 +82,17 @@ export function resolveSchedule(value: TaskSchedule, date: string, originalDate:
   } else if (date !== originalDate) { delete result.reminderAt; }
   return result;
 }
+
+export function quickReminderOptions(scheduledAt?: string, now = Date.now()) {
+  const start = scheduledAt ? Date.parse(scheduledAt) : NaN;
+  if (Number.isFinite(start)) return REMINDER_OPTIONS.filter((minutes) => minutes === 0 || minutes === 5)
+    .map((minutes) => ({ label: reminderLabel(minutes), dueAt: start - minutes * 60_000 }))
+    .filter((option) => option.dueAt > now);
+  const tomorrow = new Date(now);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  tomorrow.setHours(9, 0, 0, 0);
+  return [
+    { label: 'In 1 hour', dueAt: now + 60 * 60_000 },
+    { label: 'Tomorrow morning', dueAt: tomorrow.getTime() },
+  ].sort((a, b) => a.dueAt - b.dueAt);
+}

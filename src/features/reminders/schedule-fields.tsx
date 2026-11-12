@@ -5,7 +5,7 @@ import { ThemeColors, useAppTheme, useThemeStyles } from '@/theme/theme';
 import { currentTimeZone, REMINDER_OPTIONS, reminderLabel, scheduledInstant } from './schedule';
 import { useReminders } from './reminders-context';
 
-export function ScheduleFields({ value, onChange, date, onExpand, expanded, setExpanded }: { value: TaskSchedule; onChange: (value: TaskSchedule) => void; date: string; onExpand: () => void; expanded: 'time' | 'reminder' | null; setExpanded: Dispatch<SetStateAction<'time' | 'reminder' | null>> }) {
+export function ScheduleFields({ value, onChange, date, onExpand, expanded, setExpanded, timeOnly = false }: { timeOnly?: boolean; value: TaskSchedule; onChange: (value: TaskSchedule) => void; date: string; onExpand: () => void; expanded: 'time' | 'reminder' | null; setExpanded: Dispatch<SetStateAction<'time' | 'reminder' | null>> }) {
   const styles = useThemeStyles(createStyles);
   const { colors } = useAppTheme();
   const { info } = useReminders();
@@ -34,9 +34,11 @@ export function ScheduleFields({ value, onChange, date, onExpand, expanded, setE
     <Pressable accessibilityRole="button" accessibilityLabel={`Task time: ${label}`} accessibilityState={{ expanded: expanded === 'time' }} onPress={() => toggle('time')} style={styles.row}>
       <Text style={styles.label}>Time</Text><Text style={styles.value}>{label} {expanded === 'time' ? '−' : '+'}</Text>
     </Pressable>
+    {!timeOnly ? <>
     <Pressable accessibilityRole="button" accessibilityState={{ expanded: expanded === 'reminder' }} onPress={() => toggle('reminder')} style={styles.row}>
       <Text style={styles.label}>Remind me</Text><Text style={styles.value}>{value.reminderMinutes !== undefined ? reminderLabel(value.reminderMinutes) : value.reminderAt ? 'Custom reminder' : 'Off'} {expanded === 'reminder' ? '−' : '+'}</Text>
     </Pressable>
+    </> : null}
     </View>
     {expanded === 'time' ? <View style={styles.picker}>
       <View style={styles.timeInputs}>

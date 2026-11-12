@@ -13,7 +13,7 @@ import { AppState, Platform } from 'react-native';
 
 import { useToast } from '@/components/toast';
 import { fromDateKey, shiftDateKey, todayKey } from '@/lib/date';
-import { moveTaskDate } from '@/features/reminders/schedule';
+import { moveTaskDate, REMINDER_OPTIONS } from '@/features/reminders/schedule';
 
 import {
   createTodoBackup,
@@ -773,8 +773,10 @@ export function TodosProvider({ children }: PropsWithChildren) {
       const todo = todos.find((item) => item.id === id);
       if (!todo || !Number.isFinite(Date.parse(reminderAt)) || new Date(reminderAt).getTime() <= Date.now()) return;
 
+      const offset = todo.scheduledAt ? (Date.parse(todo.scheduledAt) - Date.parse(reminderAt)) / 60_000 : NaN;
+      const reminderMinutes = REMINDER_OPTIONS.find((minutes) => minutes === offset);
       setTodos((current) =>
-        current.map((item) => item.id === id ? { ...item, reminderAt, reminderMinutes: undefined } : item),
+        current.map((item) => item.id === id ? { ...item, reminderAt, reminderMinutes } : item),
       );
       showToast('Reminder saved', 'reminder');
     },

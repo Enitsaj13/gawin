@@ -17,10 +17,15 @@ import {
 } from '@/features/preferences/preferences-context';
 import { ThemeColors, useAppTheme, useThemeStyles } from '@/theme/theme';
 
+import { currentTimeZone, quickReminderOptions } from '@/features/reminders/schedule';
+import { toDateKey } from '@/lib/date';
+import { TaskComposer } from './task-composer';
+
 type SheetMode =
   | 'actions'
   | 'delete'
   | 'reminder'
+  | 'reminder-custom'
   | 'repeat'
   | 'repeat-custom';
 
@@ -30,6 +35,7 @@ type TaskActionsSheetProps = {
   defaultEnabled?: boolean;
   isRepeating?: boolean;
   reminderAt?: string;
+  scheduledAt?: string;
   repeatDays?: number[] | null;
   taskTitle: string;
   onClearReminder?: () => void;
@@ -52,6 +58,7 @@ export function TaskActionsSheet({
   defaultEnabled = true,
   isRepeating = false,
   reminderAt,
+  scheduledAt,
   repeatDays,
   taskTitle,
   onClearReminder,
@@ -72,6 +79,8 @@ export function TaskActionsSheet({
   const insets = useSafeAreaInsets();
   const feedback = useFeedback();
   const { preferences } = usePreferences();
+  const [reminderError, setReminderError] = useState('');
+  const [reminderNow, setReminderNow] = useState(Date.now);
   const [mode, setMode] = useState<SheetMode>(initialMode);
   const [customDays, setCustomDays] = useState(
     () => new Set(repeatDays ?? [1, 2, 3, 4, 5]),
@@ -132,6 +141,8 @@ export function TaskActionsSheet({
 
   const showReminderOptions = () => {
     feedback.selection();
+    setReminderNow(Date.now());
+    setReminderError('');
     setMode('reminder');
   };
 
@@ -145,7 +156,8 @@ export function TaskActionsSheet({
   const toggleDefault = () => dismiss(onToggleDefault);
   const setRepeatSchedule = (days: number[]) =>
     dismiss(() => onRepeatSchedule?.(days));
-  const setReminder = (date: Date) => {
+  const setReminder = (date: Date, now: number) => {
+    if (date.getTime() <= now) { setReminderError('That reminder time has passed. Choose another time.'); return; }
     onSetReminder?.(date.toISOString());
     dismiss();
   };
@@ -158,6 +170,16 @@ export function TaskActionsSheet({
 
     setMode('actions');
   };
+
+  if (mode === 'reminder-custom') {
+    const saved = reminderAt ? Date.parse(reminderAt) : NaN;
+    const initial = new Date(saved > reminderNow ? saved : reminderNow + 60 * 60_000);
+    const time = `${String(initial.getHours()).padStart(2, '0')}:${String(initial.getMinutes()).padStart(2, '0')}`;
+    return <TaskComposer reminderOnly visible date={toDateKey(initial)} heading="Choose reminder" initialTitle={taskTitle}
+      initialSchedule={{ scheduledTime: time, timeZone: currentTimeZone() }} submitLabel="Set reminder"
+      onClose={() => setMode('reminder')}
+      onSubmit={(_title, _date, _series, schedule) => { if (schedule.scheduledAt) { onSetReminder?.(schedule.scheduledAt); onClose(); } }} />;
+  }
 
   return (
     <Modal
@@ -473,13 +495,15 @@ export function TaskActionsSheet({
                 <Text numberOfLines={2} style={styles.taskTitle}>
                   {taskTitle}
                 </Text>
+                {reminderAt ? <Text style={styles.reminderSummary}>Current reminder · {formatReminderDate(Date.parse(reminderAt))}</Text> : null}
+                {reminderError ? <Text accessibilityLiveRegion="polite" style={styles.reminderSummary}>{reminderError}</Text> : null}
                 <View style={styles.actionList}>
-                  {getReminderPresets().map((preset) => (
+                  {quickReminderOptions(scheduledAt, reminderNow).map((preset) => (
                     <Pressable
                       accessibilityLabel={`${preset.label}: ${taskTitle}`}
                       accessibilityRole="button"
                       key={preset.label}
-                      onPress={() => setReminder(preset.date)}
+                      onPress={() => setReminder(new Date(preset.dueAt), Date.now())}
                       style={({ pressed }) => [
                         styles.actionRow,
                         pressed && styles.pressed,
@@ -488,10 +512,13 @@ export function TaskActionsSheet({
                       <ReminderIcon />
                       <View>
                         <Text style={styles.actionText}>{preset.label}</Text>
-                        <Text style={styles.actionMeta}>{preset.detail}</Text>
+                        <Text style={styles.actionMeta}>{formatReminderDate(preset.dueAt)}</Text>
                       </View>
                     </Pressable>
                   ))}
+                  <Pressable accessibilityRole="button" onPress={() => { feedback.selection(); setReminderNow(Date.now()); setMode('reminder-custom'); }} style={({ pressed }) => [styles.actionRow, pressed && styles.pressed]}>
+                    <ReminderIcon /><View style={styles.reminderCopy}><Text style={styles.actionText}>{scheduledAt ? 'Choose reminder' : 'Choose date & time'}</Text><Text style={styles.actionMeta}>Pick a date and time</Text></View><Text style={styles.actionText}>→</Text>
+                  </Pressable>
                   {reminderAt && onClearReminder ? (
                     <Pressable
                       accessibilityLabel={`Remove reminder for: ${taskTitle}`}
@@ -629,31 +656,8 @@ function ScheduleRow({ label, onPress }: { label: string; onPress: () => void })
   );
 }
 
-function getReminderPresets() {
-  const now = new Date();
-  const inOneHour = new Date(now.getTime() + 60 * 60 * 1000);
-  const evening = new Date(now);
-  evening.setHours(18, 0, 0, 0);
-  if (evening <= now) evening.setDate(evening.getDate() + 1);
-  const tomorrow = new Date(now);
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  tomorrow.setHours(9, 0, 0, 0);
-
-  const detail = (date: Date) =>
-    `${date.toLocaleDateString('en-US', {
-      weekday: 'short',
-      month: 'short',
-      day: 'numeric',
-    })} · ${date.toLocaleTimeString('en-US', {
-      hour: 'numeric',
-      minute: '2-digit',
-    })}`;
-
-  return [
-    { label: 'In one hour', date: inOneHour, detail: detail(inOneHour) },
-    { label: 'This evening', date: evening, detail: detail(evening) },
-    { label: 'Tomorrow morning', date: tomorrow, detail: detail(tomorrow) },
-  ];
+function formatReminderDate(instant: number) {
+  return new Date(instant).toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 }
 
 function repeatScheduleLabel(days?: number[] | null) {
@@ -824,6 +828,8 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     fontFamily: 'SpaceMono_700Bold',
     fontSize: 12,
   },
+  reminderCopy: { flex: 1 },
+  reminderSummary: { color: colors.textMuted, fontFamily: 'SpaceMono_400Regular', fontSize: 10, lineHeight: 18, marginTop: 10 },
   actionMeta: {
     marginTop: 1,
     color: colors.textMuted,

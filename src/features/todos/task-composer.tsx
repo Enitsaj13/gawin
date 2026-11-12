@@ -16,9 +16,11 @@ import type { ViewStyle } from 'react-native';
 import { formatJournalDate, fromDateKey, todayKey, toDateKey } from '@/lib/date';
 import { ThemeColors, useAppTheme, useThemeStyles } from '@/theme/theme';
 import { ScheduleFields, resolveSchedule } from '@/features/reminders/schedule-fields';
+import { REMINDER_HORIZON } from '@/features/reminders/schedule';
 import type { TaskSchedule } from './types';
 
 type TaskComposerProps = {
+  reminderOnly?: boolean;
   allowSeriesUpdate?: boolean;
   allowDateSelection?: boolean;
   allowScheduling?: boolean;
@@ -44,6 +46,7 @@ const webScrollLockStyle: ViewStyle & { overscrollBehavior: 'none' } = {
 };
 
 export function TaskComposer({
+  reminderOnly = false,
   allowSeriesUpdate = false,
   allowDateSelection = true,
   allowScheduling = true,
@@ -169,7 +172,12 @@ export function TaskComposer({
 
   const submit = () => {
     if (!title.trim()) return;
-    try { onSubmit(title, selectedDate, updateSeries, resolveSchedule(schedule, selectedDate, date, initialSchedule)); }
+    try {
+      const resolved = resolveSchedule(schedule, selectedDate, date, initialSchedule);
+      if (reminderOnly && (!resolved.scheduledAt || Date.parse(resolved.scheduledAt) <= Date.now())) throw new Error('Choose a reminder time in the future.');
+      if (reminderOnly && resolved.scheduledAt && Date.parse(resolved.scheduledAt) > Date.now() + REMINDER_HORIZON) throw new Error('Reminders can be scheduled up to a year ahead.');
+      onSubmit(title, selectedDate, updateSeries, resolved);
+    }
     catch (error) { setScheduleError(error instanceof Error ? error.message : 'Please check the task time.'); return; }
     close();
   };
@@ -218,7 +226,7 @@ export function TaskComposer({
             <ScrollView nativeID="gawin-task-editor-content" scrollEnabled={canScrollContent} style={[styles.content, Platform.OS === 'web' && webScrollLockStyle]} contentContainerStyle={styles.contentInner} keyboardShouldPersistTaps="handled" bounces={false} showsVerticalScrollIndicator={false}>
             <Text style={styles.eyebrow}>{formatJournalDate(selectedDate)}</Text>
             <Text style={styles.title}>{heading}</Text>
-            <TextInput
+            {reminderOnly ? <Text style={styles.reminderTitle}>{initialTitle}</Text> : <TextInput
               accessibilityLabel="Task title"
               autoFocus
               maxLength={80}
@@ -239,7 +247,8 @@ export function TaskComposer({
                   styles.inputWebFocused,
               ]}
               value={title}
-            />
+            />}
+            {reminderOnly ? <Text style={styles.eyebrow}>This changes the reminder only.</Text> : null}
             {allowDateSelection ? (
               <View style={styles.datePicker}>
                 <Pressable
@@ -308,7 +317,7 @@ export function TaskComposer({
                 ) : null}
               </View>
             ) : null}
-            {allowScheduling ? <ScheduleFields expanded={scheduleExpanded} setExpanded={setScheduleExpanded} date={selectedDate} value={schedule} onChange={(value) => { setSchedule(value); setScheduleError(''); }} onExpand={() => setCalendarOpen(false)} /> : null}
+            {allowScheduling ? <ScheduleFields timeOnly={reminderOnly} expanded={scheduleExpanded} setExpanded={setScheduleExpanded} date={selectedDate} value={schedule} onChange={(value) => { setSchedule(value); setScheduleError(''); }} onExpand={() => setCalendarOpen(false)} /> : null}
             {allowSeriesUpdate ? (
               <View style={styles.scopePicker}>
                 <Text style={styles.scopeLabel}>Apply name changes to</Text>
@@ -419,6 +428,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     fontFamily: 'SpaceMono_400Regular',
     fontSize: 11,
   },
+  reminderTitle: { marginTop: 12, marginBottom: 8, color: colors.textSecondary, fontFamily: 'SpaceMono_400Regular', fontSize: 14 },
   error: { marginTop: 12, color: colors.textSecondary, fontFamily: 'SpaceMono_400Regular', fontSize: 10, lineHeight: 17 },
   title: {
     marginTop: 4,
