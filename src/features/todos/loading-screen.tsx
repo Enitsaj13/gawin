@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Animated, Easing, StyleSheet, View } from 'react-native';
+import { Animated, Easing, Platform, StyleSheet, View } from 'react-native';
 
 import { usePreferences } from '@/features/preferences/preferences-context';
 import { useAppTheme } from '@/theme/theme';
@@ -31,13 +31,13 @@ export function LoadingScreen({ ready, onFinished }: LoadingScreenProps) {
         duration: preferences.reducedMotion ? 0 : 180,
         easing: Easing.out(Easing.quad),
         toValue: 1,
-        useNativeDriver: true,
+        useNativeDriver: Platform.OS !== 'web',
       }),
       Animated.timing(iconScale, {
         duration: preferences.reducedMotion ? 0 : 240,
         easing: Easing.out(Easing.cubic),
         toValue: 1,
-        useNativeDriver: true,
+        useNativeDriver: Platform.OS !== 'web',
       }),
     ]);
     intro.start();
@@ -61,26 +61,26 @@ export function LoadingScreen({ ready, onFinished }: LoadingScreenProps) {
         duration: preferences.reducedMotion ? 0 : 210,
         easing: Easing.out(Easing.cubic),
         toValue: 1,
-        useNativeDriver: true,
+        useNativeDriver: Platform.OS !== 'web',
       }),
       Animated.parallel([
         Animated.timing(checkOpacity, {
           duration: preferences.reducedMotion ? 0 : 130,
           easing: Easing.out(Easing.quad),
           toValue: 1,
-          useNativeDriver: true,
+          useNativeDriver: Platform.OS !== 'web',
         }),
         Animated.sequence([
           Animated.timing(iconScale, {
             duration: preferences.reducedMotion ? 0 : 90,
             toValue: 1.04,
-            useNativeDriver: true,
+            useNativeDriver: Platform.OS !== 'web',
           }),
           Animated.timing(iconScale, {
             duration: preferences.reducedMotion ? 0 : 110,
             easing: Easing.out(Easing.quad),
             toValue: 1,
-            useNativeDriver: true,
+            useNativeDriver: Platform.OS !== 'web',
           }),
         ]),
       ]),
@@ -89,7 +89,7 @@ export function LoadingScreen({ ready, onFinished }: LoadingScreenProps) {
         duration: preferences.reducedMotion ? 0 : 180,
         easing: Easing.in(Easing.quad),
         toValue: 0,
-        useNativeDriver: true,
+        useNativeDriver: Platform.OS !== 'web',
       }),
     ]);
 

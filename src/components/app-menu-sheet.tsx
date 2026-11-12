@@ -4,6 +4,7 @@ import {
   Animated,
   Easing,
   Modal,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -42,13 +43,13 @@ export function AppMenuSheet({
         duration: preferences.reducedMotion ? 0 : 170,
         easing: Easing.out(Easing.quad),
         toValue: 1,
-        useNativeDriver: true,
+        useNativeDriver: Platform.OS !== 'web',
       }),
       Animated.timing(translateY, {
         duration: preferences.reducedMotion ? 0 : 210,
         easing: Easing.out(Easing.cubic),
         toValue: 0,
-        useNativeDriver: true,
+        useNativeDriver: Platform.OS !== 'web',
       }),
     ]).start();
   }, [backdropOpacity, preferences.reducedMotion, translateY]);
@@ -62,13 +63,13 @@ export function AppMenuSheet({
         duration: preferences.reducedMotion ? 0 : 140,
         easing: Easing.in(Easing.quad),
         toValue: 0,
-        useNativeDriver: true,
+        useNativeDriver: Platform.OS !== 'web',
       }),
       Animated.timing(translateY, {
         duration: preferences.reducedMotion ? 0 : 160,
         easing: Easing.in(Easing.cubic),
         toValue: 32,
-        useNativeDriver: true,
+        useNativeDriver: Platform.OS !== 'web',
       }),
     ]).start(() => {
       onClose();

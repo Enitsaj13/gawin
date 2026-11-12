@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import {
   Animated,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -125,12 +126,12 @@ export function TaskRow({
         bounciness: 5,
         speed: 24,
         toValue: 1,
-        useNativeDriver: true,
+        useNativeDriver: Platform.OS !== 'web',
       }),
       Animated.timing(labelOpacity, {
         duration: 170,
         toValue: willComplete ? 0.52 : 1,
-        useNativeDriver: true,
+        useNativeDriver: Platform.OS !== 'web',
       }),
     ]).start();
 
@@ -141,13 +142,13 @@ export function TaskRow({
         Animated.timing(celebrationProgress, {
           duration: 120,
           toValue: 1,
-          useNativeDriver: true,
+          useNativeDriver: Platform.OS !== 'web',
         }),
         Animated.delay(430),
         Animated.timing(celebrationProgress, {
           duration: 180,
           toValue: 0,
-          useNativeDriver: true,
+          useNativeDriver: Platform.OS !== 'web',
         }),
       ]).start();
       onCompleteAll();

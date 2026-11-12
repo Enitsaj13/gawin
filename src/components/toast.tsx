@@ -8,7 +8,7 @@ import {
   useRef,
   useState,
 } from 'react';
-import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { usePreferences } from '@/features/preferences/preferences-context';
@@ -174,12 +174,12 @@ export function ToastProvider({ children }: PropsWithChildren) {
         Animated.timing(opacity, {
           duration: preferences.reducedMotion ? 0 : 160,
           toValue: 1,
-          useNativeDriver: true,
+          useNativeDriver: Platform.OS !== 'web',
         }),
         Animated.timing(translateY, {
           duration: preferences.reducedMotion ? 0 : 160,
           toValue: 0,
-          useNativeDriver: true,
+          useNativeDriver: Platform.OS !== 'web',
         }),
       ]).start();
 
@@ -188,12 +188,12 @@ export function ToastProvider({ children }: PropsWithChildren) {
           Animated.timing(opacity, {
             duration: preferences.reducedMotion ? 0 : 150,
             toValue: 0,
-            useNativeDriver: true,
+            useNativeDriver: Platform.OS !== 'web',
           }),
           Animated.timing(translateY, {
             duration: preferences.reducedMotion ? 0 : 150,
             toValue: 5,
-            useNativeDriver: true,
+            useNativeDriver: Platform.OS !== 'web',
           }),
         ]).start(({ finished }) => {
           if (finished && toastIdRef.current === toastId) setToastState(null);
@@ -214,12 +214,12 @@ export function ToastProvider({ children }: PropsWithChildren) {
       Animated.timing(opacity, {
         duration: preferences.reducedMotion ? 0 : 120,
         toValue: 0,
-        useNativeDriver: true,
+        useNativeDriver: Platform.OS !== 'web',
       }),
       Animated.timing(translateY, {
         duration: preferences.reducedMotion ? 0 : 120,
         toValue: 4,
-        useNativeDriver: true,
+        useNativeDriver: Platform.OS !== 'web',
       }),
     ]).start(() => setToastState(null));
   };

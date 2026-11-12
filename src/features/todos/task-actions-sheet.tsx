@@ -3,6 +3,7 @@ import {
   Animated,
   Easing,
   Modal,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -85,13 +86,13 @@ export function TaskActionsSheet({
         duration: preferences.reducedMotion ? 0 : 180,
         easing: Easing.out(Easing.quad),
         toValue: 1,
-        useNativeDriver: true,
+        useNativeDriver: Platform.OS !== 'web',
       }),
       Animated.timing(translateY, {
         duration: preferences.reducedMotion ? 0 : 220,
         easing: Easing.out(Easing.cubic),
         toValue: 0,
-        useNativeDriver: true,
+        useNativeDriver: Platform.OS !== 'web',
       }),
     ]).start();
   }, [backdropOpacity, preferences.reducedMotion, translateY]);
@@ -105,13 +106,13 @@ export function TaskActionsSheet({
         duration: preferences.reducedMotion ? 0 : 150,
         easing: Easing.in(Easing.quad),
         toValue: 0,
-        useNativeDriver: true,
+        useNativeDriver: Platform.OS !== 'web',
       }),
       Animated.timing(translateY, {
         duration: preferences.reducedMotion ? 0 : 170,
         easing: Easing.in(Easing.cubic),
         toValue: 36,
-        useNativeDriver: true,
+        useNativeDriver: Platform.OS !== 'web',
       }),
     ]).start(() => {
       onClose();
