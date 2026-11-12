@@ -1,4 +1,4 @@
-import { randomBytes, webcrypto } from 'node:crypto';
+import { webcrypto } from 'node:crypto';
 import { access, readFile, writeFile } from 'node:fs/promises';
 import { applyEdits, modify, parse, printParseErrorCode } from 'jsonc-parser';
 
@@ -72,7 +72,6 @@ const publicKey = Buffer.from(
 const privateKey = (await webcrypto.subtle.exportKey('jwk', keys.privateKey)).d;
 const secrets = {
   VAPID_PRIVATE_KEY: privateKey,
-  SETUP_CODE: randomBytes(32).toString('hex'),
 };
 for (const [name, value] of Object.entries({
   APP_ORIGIN: origin,
@@ -96,5 +95,5 @@ await writeFile(
 );
 await writeFile(configPath, configText);
 console.log(
-  'Public configuration updated. Private keys and your device connection code are in services/reminders/secrets.json (gitignored). Keep this file private and backed up.',
+  'Public configuration updated. Your private VAPID key is in services/reminders/secrets.json (gitignored). Keep this file private and backed up. Devices connect automatically after notification permission.',
 );

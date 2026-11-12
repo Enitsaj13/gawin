@@ -1,9 +1,14 @@
 import type { TaskSchedule, Todo } from '../todos/types';
+import type { RemoteReminder, RemoteStatus } from './types';
 
 export const REMINDER_OPTIONS = [0, 5, 10, 15, 30] as const;
 export const REMINDER_GRACE = 15 * 60_000;
 export const MAX_BACKGROUND_REMINDERS = 100;
 export const REMINDER_HORIZON = 366 * 86400_000;
+export function needsReminderStatusRefresh(desired: RemoteReminder[], acknowledged: RemoteStatus[], now = Date.now()) {
+  return desired.some((row) => row.dueAt <= now && !acknowledged.some((item) =>
+    item.id === row.id && item.version === row.version && ['sent', 'failed'].includes(item.status)));
+}
 export function currentTimeZone() { return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'; }
 export function validTime(value: unknown): value is string { return typeof value === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(value); }
 function wallParts(instant: number, zone: string) {

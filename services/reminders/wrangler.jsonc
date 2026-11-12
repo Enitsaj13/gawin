@@ -4,6 +4,18 @@
   "main": "worker.ts",
   "compatibility_date": "2026-11-12",
   "workers_dev": true,
+  "ratelimits": [
+    {
+      "name": "REQUEST_LIMITER",
+      "namespace_id": "15801",
+      "simple": { "limit": 120, "period": 60 }
+    },
+    {
+      "name": "REGISTRATION_LIMITER",
+      "namespace_id": "15802",
+      "simple": { "limit": 5, "period": 60 }
+    }
+  ],
   "triggers": { "crons": ["* * * * *"] },
   "vars": {
     "APP_ORIGIN": "https://gawin-phi.vercel.app",

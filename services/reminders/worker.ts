@@ -5,7 +5,9 @@ import {
 import type {
   D1Database,
   D1PreparedStatement,
+  RateLimit,
 } from '@cloudflare/workers-types';
+import { ApiError, requireDaily, reserveDaily, SERVICE_LIMITS } from './limits.ts';
 
 export type Env = {
   DB: D1Database;
@@ -13,7 +15,8 @@ export type Env = {
   VAPID_PUBLIC_KEY: string;
   VAPID_PRIVATE_KEY: string;
   VAPID_SUBJECT: string;
-  SETUP_CODE: string;
+  REQUEST_LIMITER: RateLimit;
+  REGISTRATION_LIMITER: RateLimit;
 };
 type Device = {
   id: string;
@@ -42,16 +45,6 @@ type Due = {
 };
 const GENERIC_BODY = 'You have an upcoming task.';
 const GRACE = 15 * 60_000;
-class ApiError extends Error {
-  readonly status: number;
-  constructor(
-    status: number,
-    message: string,
-  ) {
-    super(message);
-    this.status = status;
-  }
-}
 const hash = async (value: string) =>
   Array.from(
     new Uint8Array(
@@ -94,8 +87,22 @@ export function validSubscription(value: unknown): value is PushSubscription {
 async function body(request: Request): Promise<Record<string, unknown>> {
   if (!request.headers.get('content-type')?.includes('application/json'))
     throw new ApiError(415, 'JSON is required.');
-  const text = await request.text();
-  if (text.length > 65_536) throw new ApiError(413, 'Request is too large.');
+  const reader = request.body?.getReader();
+  if (!reader) throw new ApiError(400, 'Invalid request.');
+  const decoder = new TextDecoder();
+  let text = '';
+  let size = 0;
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > 65_536) {
+      void reader.cancel();
+      throw new ApiError(413, 'Request is too large.');
+    }
+    text += decoder.decode(value, { stream: true });
+  }
+  text += decoder.decode();
   try {
     const value = JSON.parse(text);
     if (!value || typeof value !== 'object' || Array.isArray(value))
@@ -170,11 +177,10 @@ async function route(request: Request, env: Env) {
   if (url.pathname === '/v1/config' && request.method === 'GET') {
     if (
       !/^[A-Za-z0-9_-]{87}$/.test(env.VAPID_PUBLIC_KEY) ||
-      !env.VAPID_PRIVATE_KEY ||
-      !env.SETUP_CODE
+      !env.VAPID_PRIVATE_KEY
     )
       throw new ApiError(503, 'Reminder service needs configuration.');
-    return { publicKey: env.VAPID_PUBLIC_KEY, maxReminders: 100 };
+    return { publicKey: env.VAPID_PUBLIC_KEY, maxReminders: 100, registration: 'automatic' };
   }
   const match = /^\/v1\/devices\/([a-f0-9]{32})(?:\/(reminders|test))?$/.exec(
     url.pathname,
@@ -186,26 +192,34 @@ async function route(request: Request, env: Env) {
   if (!/^[a-f0-9]{64}$/.test(token))
     throw new ApiError(401, 'Reconnect this device in Settings.');
   const tokenHash = await hash(token);
+  if (!(await env.REQUEST_LIMITER.limit({ key: `device:${tokenHash}` })).success)
+    throw new ApiError(429, 'Too many reminder requests. Please try again in a minute.', 60);
+  await requireDaily(env.DB, request.method === 'DELETE' ? 'disconnects' : 'requests', request.method === 'DELETE' ? 500 : SERVICE_LIMITS.requestsPerDay,
+    'The shared reminder service has reached its daily limit. Please try again tomorrow.');
   let device = await env.DB.prepare('SELECT * FROM devices WHERE id = ?')
     .bind(id)
     .first<Device>();
   if (device && !same(device.token_hash, tokenHash))
     throw new ApiError(401, 'Reconnect this device in Settings.');
   if (!action && request.method === 'PUT') {
-    if (!device) {
-      const code = request.headers.get('x-setup-code') ?? '';
-      if (
-        !env.SETUP_CODE ||
-        code.length > 256 ||
-        !same(await hash(code), await hash(env.SETUP_CODE))
-      )
-        throw new ApiError(403, 'Check your connection code.');
-    }
     const input = await body(request);
     if (!validSubscription(input.subscription))
       throw new ApiError(400, 'Unsupported push subscription.');
-    await env.DB.prepare(
-      `INSERT INTO devices (id, token_hash, subscription, origin, updated_at) VALUES (?, ?, ?, ?, ?)
+    if (!device) {
+      // Only trusted Cloudflare request metadata supplies this address in production.
+      // Salt and rotate the key daily; raw addresses are never stored or logged.
+      const network = await hash(`${env.VAPID_PRIVATE_KEY}:${Math.floor(Date.now() / 86400_000)}:${request.headers.get('cf-connecting-ip') ?? 'local'}`);
+      if (!(await env.REGISTRATION_LIMITER.limit({ key: network })).success)
+        throw new ApiError(429, 'Notifications were enabled too often on this network. Please try again in a minute.', 60);
+      await requireDaily(env.DB, `registration-network:${network}`, SERVICE_LIMITS.registrationsPerNetworkPerDay,
+        'Too many devices connected from this network today. Please try again tomorrow.');
+      await requireDaily(env.DB, 'registrations', SERVICE_LIMITS.registrationsPerDay,
+        'The shared reminder service is busy today. Please try enabling notifications tomorrow.');
+    }
+    const registered = await env.DB.prepare(
+      `INSERT INTO devices (id, token_hash, subscription, origin, updated_at) SELECT ?, ?, ?, ?, ?
+      WHERE (EXISTS(SELECT 1 FROM devices WHERE id=?) OR (SELECT COUNT(*) FROM devices)<?)
+      AND NOT EXISTS(SELECT 1 FROM devices WHERE json_extract(subscription,'$.endpoint')=? AND id!=?)
       ON CONFLICT(id) DO UPDATE SET subscription=excluded.subscription, updated_at=excluded.updated_at, invalid=0
       WHERE devices.token_hash=excluded.token_hash`,
     )
@@ -215,8 +229,19 @@ async function route(request: Request, env: Env) {
         JSON.stringify(input.subscription),
         env.APP_ORIGIN,
         Date.now(),
+        id,
+        SERVICE_LIMITS.registeredDevices,
+        input.subscription.endpoint,
+        id,
       )
       .run();
+    if (!registered.meta.changes) {
+      const owner = await env.DB.prepare("SELECT id FROM devices WHERE json_extract(subscription,'$.endpoint')=?")
+        .bind(input.subscription.endpoint).first<{ id: string }>();
+      if (owner && owner.id !== id)
+        throw new ApiError(409, 'This browser notification subscription needs resetting. Tap Enable notifications again.');
+      throw new ApiError(503, 'The shared reminder service is at capacity. Please try again later.', 3600);
+    }
     if (device?.invalid) await env.DB.prepare(`UPDATE reminders SET status='queued',attempts=0,next_attempt=0,lease_until=0
       WHERE device_id=? AND status='failed' AND expires_at>?
       AND NOT EXISTS(SELECT 1 FROM deliveries d WHERE d.device_id=reminders.device_id AND d.reminder_id=reminders.id AND d.due_at=reminders.due_at)`).bind(id, Date.now()).run();
@@ -244,7 +269,11 @@ async function route(request: Request, env: Env) {
       .bind(now + 60_000, id, now)
       .run();
     if (!claimed.meta.changes)
-      throw new ApiError(429, 'Wait a minute before sending another test.');
+      throw new ApiError(429, 'Wait a minute before sending another test.', 60);
+    await requireDaily(env.DB, `notifications:${id}`, SERVICE_LIMITS.notificationsPerDevicePerDay,
+      'This device has reached its daily notification limit. Please try again tomorrow.');
+    await requireDaily(env.DB, 'notifications', SERVICE_LIMITS.notificationsPerDay,
+      'The shared reminder service has reached its daily notification limit. Please try again tomorrow.');
     const response = await push(
       env,
       device.subscription,
@@ -270,12 +299,17 @@ async function route(request: Request, env: Env) {
       Number(revision) <= device.last_revision
     )
       throw new ApiError(409, 'Schedule changed. Retry syncing.');
+    const currentRows = await env.DB.prepare("SELECT COUNT(*) AS count FROM reminders WHERE device_id=? AND status!='cancelled'")
+      .bind(id).first<{ count: number }>();
+    await requireDaily(env.DB, 'snapshot-writes', SERVICE_LIMITS.snapshotWritesPerDay,
+      'The shared reminder service is busy today. Your changes are saved on this device and will retry tomorrow.',
+      10 + 2 * (rows.length + (currentRows?.count ?? 0)));
     const statements: D1PreparedStatement[] = [
       env.DB.prepare(
         'UPDATE devices SET last_revision=?, updated_at=? WHERE id=? AND last_revision<?',
       ).bind(revision, Date.now(), id, revision),
       env.DB.prepare(
-        `UPDATE reminders SET status='cancelled', body=? WHERE device_id=? AND id NOT IN (SELECT value FROM json_each(?)) AND (SELECT last_revision FROM devices WHERE id=?)=?`,
+        `UPDATE reminders SET status='cancelled', body=? WHERE device_id=? AND status!='cancelled' AND id NOT IN (SELECT value FROM json_each(?)) AND (SELECT last_revision FROM devices WHERE id=?)=?`,
       ).bind(GENERIC_BODY, id, JSON.stringify(rows.map((row) => row.id)), id, revision),
     ];
     // One set-based insert keeps a full snapshot below Workers Free's D1 query limit.
@@ -320,7 +354,9 @@ export async function handleRequest(
   const headers = {
     'Access-Control-Allow-Origin': env.APP_ORIGIN,
     'Access-Control-Allow-Methods': 'GET,PUT,POST,DELETE,OPTIONS',
+    // X-Setup-Code is tolerated temporarily for older cached clients; it is ignored.
     'Access-Control-Allow-Headers': 'Authorization,Content-Type,X-Setup-Code',
+    'Access-Control-Expose-Headers': 'Retry-After',
     'Access-Control-Max-Age': '3600',
     'Cache-Control': 'no-store',
     Vary: 'Origin',
@@ -328,6 +364,11 @@ export async function handleRequest(
   if (request.method === 'OPTIONS')
     return new Response(null, { status: 204, headers });
   try {
+    if (!env.REQUEST_LIMITER || !env.REGISTRATION_LIMITER)
+      throw new ApiError(503, 'Reminder service needs updating. Please try again later.', 300);
+    const network = await hash(`${env.VAPID_PRIVATE_KEY}:${request.headers.get('cf-connecting-ip') ?? 'local'}`);
+    if (!(await env.REQUEST_LIMITER.limit({ key: `network:${network}` })).success)
+      throw new ApiError(429, 'Too many reminder requests on this network. Please try again in a minute.', 60);
     return Response.json(await route(request, env), { headers });
   } catch (error) {
     return Response.json(
@@ -337,7 +378,10 @@ export async function handleRequest(
             ? error.message
             : 'Reminder service is temporarily unavailable.',
       },
-      { status: error instanceof ApiError ? error.status : 503, headers },
+      { status: error instanceof ApiError ? error.status : 503, headers: {
+        ...headers,
+        ...(error instanceof ApiError && error.retryAfter ? { 'Retry-After': String(error.retryAfter) } : {}),
+      } },
     );
   }
 }
@@ -366,6 +410,13 @@ export async function dispatchDue(env: Env, now = Date.now()) {
       .first<{ status: string; version: string }>();
     if (current?.status !== 'sending' || current.version !== row.version)
       continue;
+    const deviceAllowance = await reserveDaily(env.DB, `notifications:${row.device_id}`, SERVICE_LIMITS.notificationsPerDevicePerDay, 1, now);
+    const serviceAllowance = deviceAllowance && await reserveDaily(env.DB, 'notifications', SERVICE_LIMITS.notificationsPerDay, 1, now);
+    if (!serviceAllowance) {
+      await env.DB.prepare("UPDATE reminders SET status='failed',lease_until=0 WHERE device_id=? AND id=? AND version=? AND status='sending' AND lease_until=?")
+        .bind(row.device_id, row.id, row.version, lease).run();
+      continue;
+    }
     let status = 0;
     try {
       const response = await push(
@@ -428,6 +479,7 @@ export async function dispatchDue(env: Env, now = Date.now()) {
       env.DB.prepare('DELETE FROM devices WHERE updated_at<?').bind(
         now - 90 * 86400_000,
       ),
+      env.DB.prepare('DELETE FROM service_limits WHERE expires_at<?').bind(now - 86400_000),
     ]);
 }
 

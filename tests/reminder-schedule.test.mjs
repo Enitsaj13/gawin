@@ -4,7 +4,7 @@ import { registerHooks } from 'node:module';
 import { existsSync } from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { resolve, dirname } from 'node:path';
-import { activeReminders, backgroundReminders, moveTaskDate, nextTimedTask, resolveSchedule, scheduledInstant } from '../src/features/reminders/schedule.ts';
+import { activeReminders, backgroundReminders, moveTaskDate, needsReminderStatusRefresh, nextTimedTask, resolveSchedule, scheduledInstant } from '../src/features/reminders/schedule.ts';
 
 registerHooks({ resolve(specifier, context, next) {
   if (specifier.startsWith('@/')) return next(new URL(`../src/${specifier.slice(2)}.ts`, import.meta.url).href, context);
@@ -69,4 +69,14 @@ test('background delivery selects the nearest 100 reminders without losing local
   assert.equal(selected.at(-1).id, '2');
   assert.equal(tasks[0].id, '0');
   assert.deepEqual(backgroundReminders([distant], now), []);
+});
+test('delivery status polling waits until due and stops when the matching schedule is terminal', () => {
+  const desired = [{ id: 'task', version: 'latest', dueAt: 10_000 }];
+  assert.equal(needsReminderStatusRefresh(desired, [], 9_999), false);
+  assert.equal(needsReminderStatusRefresh(desired, [], 10_000), true);
+  assert.equal(needsReminderStatusRefresh(desired, [{ ...desired[0], status: 'queued' }], 10_000), true);
+  assert.equal(needsReminderStatusRefresh(desired, [{ ...desired[0], status: 'sent' }], 10_000), false);
+  assert.equal(needsReminderStatusRefresh(desired, [{ ...desired[0], status: 'failed' }], 10_000), false);
+  assert.equal(needsReminderStatusRefresh(desired, [{ ...desired[0], version: 'old', status: 'sent' }], 10_000), true);
+  assert.equal(needsReminderStatusRefresh([], [], 10_000), false);
 });

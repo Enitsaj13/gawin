@@ -14,8 +14,8 @@ scheduled until the API confirms them.
 
 Use a **Workers Free** account. No paid services or automatic upgrades are needed.
 The sender processes at most three notifications per minute, supports up to 100
-active reminders per device, uses indexed queries, and prunes old records. These
-limits target personal usage. Scheduled checks run every minute, so delivery is
+active reminders per device, uses indexed queries, and prunes old records. Public
+enrollment is bounded for a small shared service. Scheduled checks run every minute, so delivery is
 not exact to the second. Push can also be delayed by connectivity and device
 settings. Free-plan CPU limits must be checked against real usage after deployment;
 local tests cannot prove Cloudflare's production CPU budget.
@@ -36,8 +36,8 @@ local tests cannot prove Cloudflare's production CPU budget.
    pnpm reminders:keys --origin https://your-gawin.vercel.app --contact mailto:you@example.com
    ```
 
-   This writes public settings into `wrangler.jsonc`. It writes private keys and
-   a private connection code to gitignored files, with owner-only permissions.
+   This writes public settings into `wrangler.jsonc`. It writes the private VAPID
+   key to gitignored files, with owner-only permissions.
    Preserve these keys across deployments. Changing the public VAPID key requires
    reconnecting subscriptions. Never use an `EXPO_PUBLIC_*` variable for secrets.
 
@@ -50,15 +50,72 @@ local tests cannot prove Cloudflare's production CPU budget.
    ```
 
 5. Set `EXPO_PUBLIC_REMINDER_API_URL` in Vercel to the Worker HTTPS URL, without a
-   trailing slash. Rebuild/redeploy the PWA. No connection code goes into Vercel's
+   trailing slash. Rebuild/redeploy the PWA. No private key goes into Vercel's
    public environment.
 
-6. On your installed PWA, open **Settings → Task reminders**. Enter the connection
-   code (`SETUP_CODE` in the private `secrets.json` file) and enable notifications.
-   This is a one-time enrollment code for your private reminder service, protecting
-   the free quota from public registrations. Each device gets a separate random
-   bearer token; the database stores only its hash. Send a test notification before
+6. On your installed PWA, open **Settings → Task reminders**, tap **Enable
+   notifications**, and allow the phone permission. No account or connection code
+   is required. Each device gets a separate random bearer token; the database
+   stores only its hash. Send a test notification before
    relying on reminders. On iPhone, use a Home Screen installation on iOS 16.4+.
+
+## Updating an existing deployment
+
+Keep the existing VAPID keys and browser device records. Do not rerun key generation.
+Apply the new database migration and deploy the Worker **before** deploying the
+updated PWA:
+
+```sh
+pnpm reminders:migrate
+pnpm reminders:deploy
+```
+
+The migration adds usage counters and indexes without replacing tasks or existing
+device credentials. Both `REQUEST_LIMITER` and `REGISTRATION_LIMITER` are configured
+in `wrangler.jsonc`; their numeric namespace IDs must be unique in your Cloudflare
+account if other Workers also use the Rate Limiting API. Wrangler provisions these
+bindings during deployment. Missing bindings fail closed.
+
+An old `SETUP_CODE` secret can remain in Cloudflare and local private files; it is
+ignored. Do not rotate the VAPID keys or expose old secret files. Fresh installations
+generate only the VAPID private key. Older cached clients can still connect while
+the new frontend rolls out; the old setup-code header is tolerated and ignored.
+
+## Shared service limits
+
+The free service is intended for a small audience. Current application allowances
+are defined in `limits.ts`:
+
+| Allowance | Limit |
+| --- | --- |
+| Registered devices | 500 |
+| New device registrations | 100/day across the service |
+| New registrations from one network | 5/minute per location, 25/day globally |
+| API requests | 120/minute per network/device per location, 15,000/day globally |
+| Snapshot write budget | 35,000 weighted units/day globally |
+| Notification attempts, including tests/retries | 30/device/day, 2,000/day globally |
+| Active reminders | Nearest 100/device, within one year |
+
+Daily counters reset at UTC midnight and use atomic D1 updates. Burst controls use
+Cloudflare's approximate, per-location Rate Limiting API; they are not exact global
+quotas. Network registration keys are salted and rotated daily; raw IP addresses
+are not persisted. Network limits may affect people on the same Wi-Fi or mobile
+network. Existing devices can reconnect when new-registration limits are reached.
+Separate capacity is reserved for disconnect requests.
+
+Snapshot units conservatively account for incoming and cancelled rows. These limits
+reduce service load; they do not guarantee all Cloudflare account-level quotas or
+CPU limits, which are shared with any other services in the account. Requests denied
+by the Worker still count toward Cloudflare request usage. Distributed abuse can
+still exhaust a public service's free allowance; this is bounded anonymous enrollment,
+not bot or identity verification. Consider an additional managed challenge before
+expanding to a large public audience.
+
+When throttled, clients honor `Retry-After`, keep task changes locally, and retry
+when allowed while the app is open. Confirmed future schedules are not polled
+until due. A notification that exceeds the daily send allowance is marked failed
+and is not reported as sent. Already confirmed reminders may still fire before an
+offline or throttled cancellation reaches the server.
 
 ## Development
 
@@ -77,15 +134,16 @@ HTTPS. The frontend provides a development service worker for local push testing
 
 The optional `reminders.yml` workflow is off until repository variable
 `REMINDERS_DEPLOY_ENABLED=true` is set. Configure these repository secrets:
-`CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `VAPID_PRIVATE_KEY`, and
-`REMINDER_SETUP_CODE`. Scope the Cloudflare token to Worker deployment and the
+`CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, and `VAPID_PRIVATE_KEY`.
+Scope the Cloudflare token to Worker deployment and the
 reminder D1 database. Commit only public `wrangler.jsonc` configuration. PWA
 deployments continue through the existing Vercel connection independently.
 
 ## Delivery and security
 
-- CORS accepts only the configured PWA origin. Enrollment requires the connection
-  code; all later device requests require that device's token.
+- CORS accepts only the configured PWA origin. Public device enrollment is rate
+  limited; all later device requests require that device's token. CORS is not a
+  substitute for authentication or abuse protection.
 - Full snapshots include increasing revisions. Stale writes are rejected. Missing
   reminders are cancelled; in-flight leases survive identical snapshots.
 - A delivery ledger prevents resending the same task/time after successful dispatch.
@@ -110,7 +168,9 @@ pnpm test
 pnpm exec wrangler deploy --dry-run --config services/reminders/wrangler.jsonc
 ```
 
-Tests use SQLite to exercise authentication, stale snapshots, cancellation,
-concurrent delivery, leases, retry bounds and expiry. A separate receiver decrypts
+Tests use SQLite to exercise public enrollment, device isolation, shared limits,
+stale snapshots, cancellation, concurrent delivery, leases, retry bounds and expiry.
+Frontend tests verify one-tap permission, credential preservation and retry backoff.
+A separate receiver decrypts
 the generated AES128GCM payload to check standards-compatible encryption.
 Real iPhone locked/closed/offline delivery still needs device testing with a live service.

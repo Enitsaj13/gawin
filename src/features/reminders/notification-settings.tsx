@@ -1,17 +1,15 @@
 import { useState } from 'react';
-import { Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { ThemeColors, useAppTheme, useThemeStyles } from '@/theme/theme';
+import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ThemeColors, useThemeStyles } from '@/theme/theme';
 import { useReminders } from './reminders-context';
 
 export function NotificationSettings() {
   const styles = useThemeStyles(createStyles);
-  const { colors } = useAppTheme();
   const reminders = useReminders();
-  const [code, setCode] = useState('');
   const [message, setMessage] = useState('');
   const run = async (action: () => Promise<void>, success: string) => {
     setMessage('');
-    try { await action(); setCode(''); setMessage(success); }
+    try { await action(); setMessage(success); }
     catch (error) { setMessage(error instanceof Error ? error.message : 'Please try again.'); }
   };
   const info = reminders.info;
@@ -19,8 +17,8 @@ export function NotificationSettings() {
     <View style={styles.statusRow}><Text style={styles.title}>Notifications</Text><Text style={styles.status}>{info?.connected ? 'Connected' : info?.permission === 'denied' ? 'Blocked' : 'Not connected'}</Text></View>
     <Text style={styles.body}>{info?.description ?? 'Checking notification support…'}</Text>
     {info?.supported && info.configured && !info.connected ? <>
-      {Platform.OS === 'web' ? <TextInput accessibilityLabel="Reminder connection code" autoCapitalize="none" autoCorrect={false} secureTextEntry maxLength={256} onChangeText={setCode} placeholder="Connection code" placeholderTextColor={colors.textMuted} selectionColor={colors.accent} style={[styles.input, styles.webInput]} value={code} /> : null}
-      <Pressable accessibilityRole="button" disabled={reminders.busy || !reminders.online || info.permission === 'denied'} onPress={() => void run(() => reminders.connect(code), 'Notifications connected. Your reminders will now sync.')} style={[styles.primary, (reminders.busy || !reminders.online || info.permission === 'denied') && styles.disabled]}><Text style={styles.primaryText}>{reminders.busy ? 'Connecting…' : 'Enable notifications'}</Text></Pressable>
+      {Platform.OS === 'web' ? <Text style={styles.body}>Only reminder times and this device’s notification subscription are shared. Task titles stay private unless you choose to show them.</Text> : null}
+      <Pressable accessibilityRole="button" accessibilityState={{ busy: reminders.busy }} disabled={reminders.busy || !reminders.online || info.permission === 'denied'} onPress={() => void run(reminders.connect, 'Notifications enabled on this device. Your reminders will now sync.')} style={[styles.primary, (reminders.busy || !reminders.online || info.permission === 'denied') && styles.disabled]}><Text style={styles.primaryText}>{reminders.busy ? 'Connecting…' : 'Enable notifications'}</Text></Pressable>
     </> : null}
     {info?.connected ? <>
       <Pressable accessibilityRole="switch" accessibilityState={{ checked: info.showTitles, disabled: reminders.busy }} disabled={reminders.busy} onPress={() => void run(() => reminders.privacy(!info.showTitles), reminders.online ? 'Notification privacy updated.' : 'Saved here. Background changes will sync when connected.')} style={styles.row}>
@@ -42,7 +40,6 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   body: { fontFamily: 'SpaceMono_400Regular', fontSize: 10, lineHeight: 18, color: colors.textMuted, marginTop: 8 }, row: { minHeight: 56, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: 1, borderColor: colors.border, gap: 10 },
   link: { fontFamily: 'SpaceMono_400Regular', fontSize: 10, color: colors.textSecondary, textDecorationLine: 'underline' }, arrow: { color: colors.textMuted, fontSize: 14 },
   checkbox: { width: 18, height: 18, borderWidth: 1, borderColor: colors.borderStrong, justifyContent: 'center', alignItems: 'center' }, checked: { backgroundColor: colors.accent, borderColor: colors.accent }, check: { color: colors.accentText, fontSize: 12 },
-  input: { minHeight: 48, borderBottomWidth: 1, borderColor: colors.borderStrong, fontSize: 13, fontFamily: 'SpaceMono_400Regular', color: colors.text, marginTop: 10 }, webInput: { outlineWidth: 0 },
   primary: { minHeight: 48, backgroundColor: colors.accent, justifyContent: 'center', alignItems: 'center', marginTop: 18 }, primaryText: { color: colors.accentText, fontFamily: 'SpaceMono_700Bold', fontSize: 11 },
   disabled: { opacity: 0.45 }, message: { fontFamily: 'SpaceMono_400Regular', fontSize: 10, lineHeight: 18, color: colors.textSecondary, marginTop: 14 },
 });

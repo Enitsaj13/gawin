@@ -23,11 +23,10 @@ test('setup creates matching keys privately and refuses to rotate them accidenta
   assert.equal(result.status, 0, result.stderr);
   const secrets = JSON.parse(await readFile(join(dir, 'secrets.json'), 'utf8'));
   const config = JSON.parse(await readFile(join(dir, 'wrangler.jsonc'), 'utf8'));
-  assert.match(secrets.SETUP_CODE, /^[a-f0-9]{64}$/);
+  assert.deepEqual(Object.keys(secrets), ['VAPID_PRIVATE_KEY']);
   const key = createECDH('prime256v1'); key.setPrivateKey(Buffer.from(secrets.VAPID_PRIVATE_KEY, 'base64url'));
   assert.equal(key.getPublicKey().toString('base64url'), config.vars.VAPID_PUBLIC_KEY);
   assert.equal((await stat(join(dir, 'secrets.json'))).mode & 0o777, 0o600);
-  assert.ok(!result.stdout.includes(secrets.SETUP_CODE));
   assert.ok(!result.stdout.includes(secrets.VAPID_PRIVATE_KEY));
   assert.equal(run().status, 1);
   assert.deepEqual(JSON.parse(await readFile(join(dir, 'secrets.json'), 'utf8')), secrets);

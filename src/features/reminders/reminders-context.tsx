@@ -4,14 +4,14 @@ import { useAppLock } from '@/features/app-lock/app-lock-context';
 import { useTodos } from '@/features/todos/todos-context';
 import type { Todo } from '@/features/todos/types';
 import * as notifications from './notifications';
-import { activeReminders, backgroundReminders, reminderKey, REMINDER_GRACE } from './schedule';
+import { activeReminders, backgroundReminders, needsReminderStatusRefresh, reminderKey, REMINDER_GRACE } from './schedule';
 import type { NotificationInfo, ReminderStatus, RemoteReminder, RemoteStatus } from './types';
 
 type ReminderContext = {
   info: NotificationInfo | null; online: boolean; syncError: string; busy: boolean; soundEnabled: boolean;
   activeTask: Todo | null; openTaskId: string | null;
   status: (todo: Todo) => ReminderStatus | undefined;
-  connect: (code: string) => Promise<void>; disconnect: () => Promise<void>; test: () => Promise<void>;
+  connect: () => Promise<void>; disconnect: () => Promise<void>; test: () => Promise<void>;
   privacy: (show: boolean) => Promise<void>; retry: () => void; dismiss: () => void; snooze: () => Promise<void>;
   enableSound: () => Promise<void>; disableSound: () => void; previewSound: () => void; consumeOpenTask: () => void;
 };
@@ -34,6 +34,7 @@ export function RemindersProvider({ children }: PropsWithChildren) {
   const syncing = useRef(false);
   const syncAgain = useRef(false);
   const ackFingerprint = useRef('');
+  const latestAcknowledged = useRef<RemoteStatus[]>([]);
   const source = useRef({ todos, unlocked: false, sound: false, active: null as typeof active });
   const presenting = useRef(false);
   const received = useRef(new Set<string>());
@@ -71,8 +72,11 @@ export function RemindersProvider({ children }: PropsWithChildren) {
     syncing.current = true;
     const fingerprint = JSON.stringify(desired);
     try {
+      // A confirmed future schedule needs no polling until a delivery is due.
+      if (fingerprint === ackFingerprint.current && !needsReminderStatusRefresh(desired, latestAcknowledged.current)) return;
       const statuses = fingerprint === ackFingerprint.current ? await notifications.fetchReminderStatuses() : await notifications.synchronizeReminders(desired);
       setAcknowledged(statuses);
+      latestAcknowledged.current = statuses;
       ackFingerprint.current = fingerprint;
       setSyncError('');
     } catch (error) {
@@ -160,7 +164,7 @@ export function RemindersProvider({ children }: PropsWithChildren) {
   };
 
   return <Context.Provider value={{ info, online, syncError, busy, soundEnabled, activeTask, openTaskId, status,
-    connect: (code) => action(() => notifications.connectNotifications(code)), disconnect: () => action(() => notifications.disconnectNotifications()),
+    connect: () => action(() => notifications.connectNotifications()), disconnect: () => action(() => notifications.disconnectNotifications()),
     test: () => action(() => notifications.testNotification()), privacy: (show) => action(() => notifications.setNotificationPrivacy(show)),
     retry: () => { ackFingerprint.current = ''; setRetry((value) => Math.max(Date.now(), value + 1)); }, dismiss, snooze,
     enableSound: async () => { await notifications.enableAlarmSound(); setSoundEnabled(true); notifications.previewAlarmSound(); },

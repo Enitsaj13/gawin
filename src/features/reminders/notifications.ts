@@ -12,7 +12,7 @@ export async function notificationInfo(): Promise<NotificationInfo> {
     showTitles: settings ? JSON.parse(settings).showTitles === true : false,
     description: 'Native reminders are scheduled on this device and can alert you while Gawin is closed.' };
 }
-export async function connectNotifications(_code: string) {
+export async function connectNotifications() {
   if (!(await Notifications.requestPermissionsAsync()).granted) throw new Error('Allow notifications in device Settings to receive reminders.');
 }
 export async function disconnectNotifications() { throw new Error('Manage notification permission in your phone Settings.'); }

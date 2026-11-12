@@ -7,11 +7,18 @@ let registration: ServiceWorkerRegistration | null = null;
 let audio: AudioContext | null = null;
 let audioTimer: ReturnType<typeof setInterval> | undefined;
 let audioStop: ReturnType<typeof setTimeout> | undefined;
+let retryNotBefore = 0;
+let retryMessage = '';
 const GENERIC = 'You have an upcoming task.';
 export function isOnline() { return navigator.onLine; }
 export const supportsAlarmSound = true;
 function saved(): Device | null {
-  try { return JSON.parse(localStorage.getItem(STORAGE) ?? 'null') as Device | null; } catch { return null; }
+  try {
+    const value = JSON.parse(localStorage.getItem(STORAGE) ?? 'null');
+    return value && /^[a-f0-9]{32}$/.test(value.id) && /^[a-f0-9]{64}$/.test(value.token) &&
+      typeof value.api === 'string' && typeof value.connected === 'boolean' && typeof value.showTitles === 'boolean' &&
+      Number.isSafeInteger(value.revision) ? value : null;
+  } catch { return null; }
 }
 function save(device: Device) { localStorage.setItem(STORAGE, JSON.stringify(device)); }
 function randomHex(size: number) { return Array.from(crypto.getRandomValues(new Uint8Array(size)), (byte) => byte.toString(16).padStart(2, '0')).join(''); }
@@ -33,28 +40,40 @@ async function getRegistration() {
   if (registration?.active) return registration;
   const existing = await navigator.serviceWorker.getRegistration('/');
   if (!existing) await navigator.serviceWorker.register(__DEV__ ? '/reminder-sw.js' : '/sw.js', { scope: '/', updateViaCache: 'none' });
-  registration = await Promise.race([
-    navigator.serviceWorker.ready,
-    new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Notification setup is taking too long. Reopen Gawin and try again.')), 12_000)),
-  ]);
-  return registration;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    registration = await Promise.race([
+      navigator.serviceWorker.ready,
+      new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error('Notification setup is taking too long. Reopen Gawin and try again.')), 12_000); }),
+    ]);
+    return registration;
+  } finally { clearTimeout(timer); }
 }
-async function request(path: string, method: string, data?: unknown, setupCode?: string) {
+async function request(path: string, method: string, data?: unknown) {
   if (!isOnline()) throw new Error('Connect to the internet to update background reminders.');
   if (!apiConfigured()) throw new Error('Background reminders are not connected yet.');
+  if (method !== 'DELETE' && Date.now() < retryNotBefore) throw new Error(retryMessage);
   const device = saved();
   let response: Response;
   try { response = await fetch(`${API}${path}`, { method, cache: 'no-store', signal: AbortSignal.timeout(15_000), headers: {
     'Content-Type': 'application/json', ...(device ? { Authorization: `Bearer ${device.token}` } : {}),
-    ...(setupCode ? { 'X-Setup-Code': setupCode } : {}),
   }, ...(data === undefined ? {} : { body: JSON.stringify(data) }) }); }
   catch { throw new Error('Could not reach the reminder service. Your changes are saved and will retry.'); }
-  let result: { error?: unknown; publicKey?: string; reminders?: RemoteStatus[] };
+  let result: { error?: unknown; publicKey?: string; reminders?: RemoteStatus[]; registration?: string };
   try { result = await response.json(); }
   catch { throw new Error('The reminder service did not respond correctly. Please try again.'); }
   if (!response.ok) {
     if (device && (response.status === 401 || response.status === 410)) save({ ...device, connected: false, resetSubscription: response.status === 410 });
-    throw new Error(typeof result.error === 'string' ? result.error : 'Reminders could not sync. Please try again.');
+    const message = typeof result.error === 'string' ? result.error : 'Reminders could not sync. Please try again.';
+    const retrySeconds = Number(response.headers.get('Retry-After'));
+    if ([429, 503].includes(response.status) && retrySeconds > 0 && Number.isFinite(retrySeconds)) {
+      retryNotBefore = Date.now() + Math.min(retrySeconds, 86400) * 1000;
+      retryMessage = message;
+    }
+    if (response.status === 409 && method === 'PUT' && !path.endsWith('/reminders') && device) {
+      save({ ...device, connected: false, resetSubscription: true });
+    }
+    throw new Error(message);
   }
   return result;
 }
@@ -62,23 +81,24 @@ function publicKeyBytes(key: string) {
   const decoded = atob(key.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - key.length % 4) % 4));
   return Uint8Array.from(decoded, (letter) => letter.charCodeAt(0));
 }
-export async function connectNotifications(code: string) {
+export async function connectNotifications() {
   // Request permission directly from the user's button press.
   const permission = 'Notification' in window ? (Notification.permission === 'granted' ? Promise.resolve('granted') : Notification.requestPermission()) : Promise.resolve('denied');
   if (await permission !== 'granted') throw new Error('Allow notifications to connect reminders on this device.');
   const worker = await getRegistration();
   const config = await request('/v1/config', 'GET');
   if (typeof config.publicKey !== 'string') throw new Error('The reminder service is not ready. Please try again later.');
+  if (config.registration !== 'automatic') throw new Error('Notification setup is being updated. Please try again later.');
+  const old = saved();
   let subscription = await worker.pushManager.getSubscription();
   const expectedKey = publicKeyBytes(config.publicKey);
   const subscribedKey = subscription?.options.applicationServerKey ? new Uint8Array(subscription.options.applicationServerKey) : null;
   const changedKey = subscribedKey && (subscribedKey.length !== expectedKey.length || !subscribedKey.every((byte, index) => byte === expectedKey[index]));
-  if ((saved()?.resetSubscription || changedKey) && subscription) { await subscription.unsubscribe(); subscription = null; }
+  if ((!old || old.api !== API || old.resetSubscription || changedKey) && subscription) { await subscription.unsubscribe(); subscription = null; }
   if (!subscription) subscription = await worker.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: publicKeyBytes(config.publicKey) });
-  const old = saved();
   const device = old?.api === API ? old : { id: randomHex(16), token: randomHex(32), connected: false, showTitles: false, revision: 0, api: API };
   save(device);
-  await request(`/v1/devices/${device.id}`, 'PUT', { subscription: subscription.toJSON() }, code.trim());
+  await request(`/v1/devices/${device.id}`, 'PUT', { subscription: subscription.toJSON() });
   save({ ...device, connected: true, resetSubscription: false });
   await setNotificationPrivacy(device.showTitles);
 }

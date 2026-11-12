@@ -1,9 +1,15 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import { createECDH, randomBytes, hkdfSync, createDecipheriv } from 'node:crypto';
 import { handleRequest, dispatchDue, validateReminders, validSubscription } from '../services/reminders/worker.ts';
+import { reserveDaily, SERVICE_LIMITS } from '../services/reminders/limits.ts';
+
+class Limiter {
+  allowed = true;
+  async limit() { return { success: this.allowed }; }
+}
 
 class Database {
   constructor(sqlite) { this.sqlite = sqlite; }
@@ -26,21 +32,28 @@ class Database {
 async function fixture(t) {
   const sqlite = new DatabaseSync(':memory:');
   sqlite.exec('PRAGMA foreign_keys=ON');
-  sqlite.exec(readFileSync(new URL('../services/reminders/migrations/0001_reminders.sql', import.meta.url), 'utf8'));
+  const migrations = new URL('../services/reminders/migrations/', import.meta.url);
+  for (const file of readdirSync(migrations).filter((name) => name.endsWith('.sql')).sort()) {
+    sqlite.exec(readFileSync(new URL(file, migrations), 'utf8'));
+  }
   t.after(() => sqlite.close());
   const receiver = createECDH('prime256v1'); receiver.generateKeys();
   const vapid = createECDH('prime256v1'); vapid.generateKeys();
   const auth = randomBytes(16);
   const subscription = { endpoint: 'https://web.push.apple.com/test', keys: { p256dh: receiver.getPublicKey().toString('base64url'), auth: auth.toString('base64url') } };
-  const env = { DB: new Database(sqlite), APP_ORIGIN: 'https://gawin.example', VAPID_PUBLIC_KEY: vapid.getPublicKey().toString('base64url'), VAPID_PRIVATE_KEY: vapid.getPrivateKey().toString('base64url'), VAPID_SUBJECT: 'mailto:owner@example.com', SETUP_CODE: randomBytes(32).toString('hex') };
+  const env = { DB: new Database(sqlite), APP_ORIGIN: 'https://gawin.example', VAPID_PUBLIC_KEY: vapid.getPublicKey().toString('base64url'), VAPID_PRIVATE_KEY: vapid.getPrivateKey().toString('base64url'), VAPID_SUBJECT: 'mailto:owner@example.com', REQUEST_LIMITER: new Limiter(), REGISTRATION_LIMITER: new Limiter() };
   const id = randomBytes(16).toString('hex'), token = randomBytes(32).toString('hex');
   const api = (path = '', method = 'GET', data, extra = {}) => handleRequest(new Request(`https://reminders.example/v1/devices/${id}${path}`, { method, headers: { Origin: env.APP_ORIGIN, Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', ...extra }, ...(data === undefined ? {} : { body: JSON.stringify(data) }) }), env);
-  const connect = await api('', 'PUT', { subscription }, { 'X-Setup-Code': env.SETUP_CODE });
+  const connect = await api('', 'PUT', { subscription });
   assert.equal(connect.status, 200);
   const now = Date.now();
   const row = { id: 'meeting', version: 'a'.repeat(64), dueAt: now - 1000 };
   const sync = (rows, revision) => api('/reminders', 'PUT', { reminders: rows, revision });
-  return { env, sqlite, receiver, auth, subscription, api, row, now, sync };
+  const register = (deviceId, bearer, endpoint = `https://web.push.apple.com/${deviceId}`, extra = {}) => handleRequest(new Request(`https://reminders.example/v1/devices/${deviceId}`, {
+    method: 'PUT', headers: { Origin: env.APP_ORIGIN, Authorization: `Bearer ${bearer}`, 'Content-Type': 'application/json', ...extra },
+    body: JSON.stringify({ subscription: { ...subscription, endpoint } }),
+  }), env);
+  return { env, sqlite, receiver, auth, subscription, api, row, now, sync, id, token, register };
 }
 function decryptPush(body, receiver, auth) {
   const bytes = Buffer.from(body);
@@ -59,14 +72,17 @@ function decryptPush(body, receiver, auth) {
   return JSON.parse(plain.subarray(0, end).toString());
 }
 
-test('API requires the allowed origin, a connection code for enrollment, and a per-device token', async (t) => {
+test('public enrollment needs no setup code and each device requires its own token', async (t) => {
   const f = await fixture(t);
   assert.equal((await f.api('/reminders', 'GET', undefined, { Origin: 'https://evil.example' })).status, 403);
   assert.equal((await f.api('/reminders', 'GET', undefined, { Authorization: `Bearer ${'0'.repeat(64)}` })).status, 401);
   const id = randomBytes(16).toString('hex');
-  const response = await handleRequest(new Request(`https://reminders.example/v1/devices/${id}`, { method: 'PUT', headers: { Origin: f.env.APP_ORIGIN, Authorization: `Bearer ${'1'.repeat(64)}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ subscription: f.subscription }) }), f.env);
-  assert.equal(response.status, 403);
-  assert.notEqual(f.sqlite.prepare('SELECT token_hash FROM devices').get().token_hash, '1'.repeat(64));
+  const response = await f.register(id, '1'.repeat(64));
+  assert.equal(response.status, 200);
+  assert.notEqual(f.sqlite.prepare('SELECT token_hash FROM devices WHERE id=?').get(id).token_hash, '1'.repeat(64));
+  const config = await handleRequest(new Request('https://reminders.example/v1/config', { headers: { Origin: f.env.APP_ORIGIN } }), f.env);
+  assert.equal(config.status, 200);
+  assert.equal((await config.json()).registration, 'automatic');
   assert.equal(validSubscription({ ...f.subscription, endpoint: 'https://internal.example/admin' }), false);
   assert.equal(validSubscription({ ...f.subscription, endpoint: 'http://web.push.apple.com/test' }), false);
 });
@@ -152,4 +168,105 @@ test('expired push subscriptions require reconnecting instead of retrying foreve
   await dispatchDue(f.env, f.now);
   assert.equal((await f.api('/reminders')).status, 410);
   assert.equal(f.sqlite.prepare('SELECT invalid FROM devices').get().invalid, 1);
+});
+
+test('devices cannot read, replace, or delete another device reminder schedule', async (t) => {
+  const f = await fixture(t);
+  await f.sync([{ ...f.row, body: 'Private appointment' }], 1);
+  const otherId = randomBytes(16).toString('hex');
+  const otherToken = randomBytes(32).toString('hex');
+  assert.equal((await f.register(otherId, otherToken)).status, 200);
+  for (const method of ['GET', 'PUT', 'DELETE']) {
+    const response = await handleRequest(new Request(`https://reminders.example/v1/devices/${f.id}${method === 'DELETE' ? '' : '/reminders'}`, {
+      method, headers: { Origin: f.env.APP_ORIGIN, Authorization: `Bearer ${otherToken}`, 'Content-Type': 'application/json' },
+      ...(method === 'PUT' ? { body: JSON.stringify({ revision: 2, reminders: [] }) } : {}),
+    }), f.env);
+    assert.equal(response.status, 401);
+  }
+  const own = await handleRequest(new Request(`https://reminders.example/v1/devices/${otherId}/reminders`, {
+    headers: { Origin: f.env.APP_ORIGIN, Authorization: `Bearer ${otherToken}` },
+  }), f.env);
+  assert.deepEqual((await own.json()).reminders, []);
+  assert.equal(f.sqlite.prepare('SELECT body FROM reminders WHERE device_id=?').get(f.id).body, 'Private appointment');
+});
+
+test('burst limits run before database work and registration throttles keep existing devices connected', async (t) => {
+  const f = await fixture(t);
+  f.env.REQUEST_LIMITER.allowed = false;
+  const prepare = t.mock.method(f.env.DB, 'prepare');
+  const denied = await f.api('/reminders');
+  assert.equal(denied.status, 429);
+  assert.equal(denied.headers.get('Retry-After'), '60');
+  assert.equal(prepare.mock.callCount(), 0);
+  f.env.REQUEST_LIMITER.allowed = true;
+  f.env.REGISTRATION_LIMITER.allowed = false;
+  assert.equal((await f.register(randomBytes(16).toString('hex'), randomBytes(32).toString('hex'))).status, 429);
+  assert.equal((await f.api('', 'PUT', { subscription: f.subscription })).status, 200);
+  assert.equal(f.sqlite.prepare('SELECT COUNT(*) AS count FROM devices').get().count, 1);
+});
+
+test('daily limits are atomic, expire at UTC midnight, and reserve capacity for disconnecting', async (t) => {
+  const f = await fixture(t);
+  const first = Date.parse('2027-01-01T23:59:59Z');
+  const claims = await Promise.all(Array.from({ length: 8 }, () => reserveDaily(f.env.DB, 'concurrent-test', 3, 1, first)));
+  assert.equal(claims.filter(Boolean).length, 3);
+  assert.equal(await reserveDaily(f.env.DB, 'concurrent-test', 3, 1, first + 2000), true);
+  assert.equal(await reserveDaily(f.env.DB, 'requests', SERVICE_LIMITS.requestsPerDay, SERVICE_LIMITS.requestsPerDay), false);
+  const day = Math.floor(Date.now() / 86400_000);
+  f.sqlite.prepare('UPDATE service_limits SET used=? WHERE key=?').run(SERVICE_LIMITS.requestsPerDay, `requests:${day}`);
+  const response = await f.api('/reminders');
+  assert.equal(response.status, 429);
+  assert.ok(Number(response.headers.get('Retry-After')) > 0);
+  assert.equal((await f.api('', 'DELETE')).status, 200);
+});
+
+test('public enrollment caps registrations and never accepts a duplicate subscription', async (t) => {
+  const f = await fixture(t);
+  const other = randomBytes(16).toString('hex');
+  assert.equal((await f.register(other, '1'.repeat(64), f.subscription.endpoint)).status, 409);
+  const day = Math.floor(Date.now() / 86400_000);
+  f.sqlite.prepare('UPDATE service_limits SET used=? WHERE key=?').run(SERVICE_LIMITS.registrationsPerDay, `registrations:${day}`);
+  const denied = await f.register(other, '1'.repeat(64));
+  assert.equal(denied.status, 429);
+  assert.equal(f.sqlite.prepare('SELECT COUNT(*) AS count FROM devices').get().count, 1);
+  assert.equal((await f.api('', 'PUT', { subscription: f.subscription })).status, 200);
+  const keys = f.sqlite.prepare("SELECT key FROM service_limits WHERE key LIKE 'registration-network:%'").all();
+  assert.ok(keys.every((row) => /^registration-network:[a-f0-9]{64}:\d+$/.test(row.key)));
+});
+
+test('registration is refused at shared device capacity while a known device can reconnect', async (t) => {
+  const f = await fixture(t);
+  const insert = f.sqlite.prepare('INSERT INTO devices (id,token_hash,subscription,origin,updated_at) VALUES(?,?,?,?,?)');
+  for (let index = 1; index < SERVICE_LIMITS.registeredDevices; index++) {
+    insert.run(`seed-${index}`, 'unused', JSON.stringify({ ...f.subscription, endpoint: `https://web.push.apple.com/seed-${index}` }), f.env.APP_ORIGIN, f.now);
+  }
+  const response = await f.register(randomBytes(16).toString('hex'), '1'.repeat(64));
+  assert.equal(response.status, 503);
+  assert.equal(response.headers.get('Retry-After'), '3600');
+  assert.equal((await f.api('', 'PUT', { subscription: f.subscription })).status, 200);
+});
+
+test('snapshot budgets leave the last confirmed schedule intact', async (t) => {
+  const f = await fixture(t);
+  await f.sync([f.row], 1);
+  const day = Math.floor(Date.now() / 86400_000);
+  f.sqlite.prepare('UPDATE service_limits SET used=? WHERE key=?').run(SERVICE_LIMITS.snapshotWritesPerDay, `snapshot-writes:${day}`);
+  assert.equal((await f.sync([], 2)).status, 429);
+  assert.equal(f.sqlite.prepare('SELECT status FROM reminders').get().status, 'queued');
+  assert.equal(f.sqlite.prepare('SELECT last_revision FROM devices').get().last_revision, 1);
+});
+
+test('notification caps prevent sends and oversized anonymous bodies are rejected', async (t) => {
+  const f = await fixture(t);
+  await f.sync([f.row], 1);
+  await reserveDaily(f.env.DB, `notifications:${f.id}`, SERVICE_LIMITS.notificationsPerDevicePerDay, SERVICE_LIMITS.notificationsPerDevicePerDay);
+  const fetch = t.mock.method(globalThis, 'fetch', async () => new Response('', { status: 201 }));
+  await dispatchDue(f.env, f.now);
+  assert.equal(fetch.mock.callCount(), 0);
+  assert.equal(f.sqlite.prepare('SELECT status FROM reminders').get().status, 'failed');
+  const response = await handleRequest(new Request(`https://reminders.example/v1/devices/${f.id}`, {
+    method: 'PUT', headers: { Origin: f.env.APP_ORIGIN, Authorization: `Bearer ${f.token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ input: 'a'.repeat(70_000) }),
+  }), f.env);
+  assert.equal(response.status, 413);
 });

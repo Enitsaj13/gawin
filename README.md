@@ -98,6 +98,10 @@ changes apply to that occurrence only. Old backups remain compatible; new backup
 retain task times and reminder offsets.
 
 Push reminders upload only selected reminder schedules and a device subscription.
+Anyone can enable notifications from Settings without an account or connection code.
+Each device is registered automatically with its own private token. The shared
+service uses request, registration, reminder, and notification limits to protect
+the free allowance; busy-service responses retry automatically while the app is open.
 Titles stay local by default. Offline edits and cancellations wait until Gawin is
 open and connected again. The server may send a previously registered reminder
 before it receives an offline cancellation. PINs and biometric credentials never
