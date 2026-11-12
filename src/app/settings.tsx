@@ -1,13 +1,14 @@
 import Constants from 'expo-constants';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useState } from 'react';
+import { type ReactNode, useState } from 'react';
 import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BackButton } from '@/components/back-button';
 import { useToast } from '@/components/toast';
 import { useAppLock } from '@/features/app-lock/app-lock-context';
+import { BiometricIcon } from '@/features/app-lock/biometric-icon';
 import { PinModal, PinMode } from '@/features/app-lock/pin-screen';
 import {
   BackupReminderDays,
@@ -145,9 +146,17 @@ export default function SettingsScreen() {
               onPress={() => { feedback.selection(); setPinMode(lock.enabled ? 'disable' : 'setup'); }}
             />
             <Text style={styles.sectionBody}>
-              {lock.enabled ? 'Your six-digit PIN is required when opening Gawin.' : 'Keep access private with a six-digit PIN. Works offline.'}
+              {lock.enabled ? (lock.biometricEnabled ? 'Unlock with your PIN or your device.' : 'Your six-digit PIN is required when opening Gawin.') : 'Keep access private with a six-digit PIN. Works offline.'}
             </Text>
             {lock.enabled ? <>
+              <SettingToggle
+                enabled={lock.biometricEnabled}
+                disabled={!lock.biometricEnabled && !lock.deviceCapability?.supported}
+                label={lock.deviceCapability?.label ?? 'Device unlock'}
+                icon={<BiometricIcon kind={lock.deviceCapability?.icon ?? 'device'} size={18} />}
+                onPress={() => { feedback.selection(); setPinMode(lock.biometricEnabled ? 'biometric-disable' : 'biometric-enable'); }}
+              />
+              <Text style={styles.sectionBody}>{lock.deviceCapability?.description ?? 'Checking device support…'}</Text>
               <Pressable accessibilityRole="button" onPress={() => setPinMode('change')} style={({ pressed }) => [styles.navigationRow, pressed && styles.pressed]}>
                 <Text style={styles.navigationTitle}>Change PIN</Text>
                 <Text style={styles.navigationArrow}>→</Text>
@@ -276,7 +285,7 @@ export default function SettingsScreen() {
         mode={pinMode}
         onClose={() => setPinMode(null)}
         onDone={() => {
-          showToast(pinMode === 'setup' ? 'App Lock enabled' : pinMode === 'disable' ? 'App Lock turned off' : 'PIN changed', 'edit');
+          showToast(pinMode === 'setup' ? 'App Lock enabled' : pinMode === 'disable' ? 'App Lock turned off' : pinMode === 'biometric-enable' ? 'Device unlock enabled' : pinMode === 'biometric-disable' ? 'Device unlock turned off' : 'PIN changed', 'edit');
           setPinMode(null);
         }}
       /> : null}
@@ -296,23 +305,29 @@ function SettingToggle({
   enabled,
   label,
   onPress,
+  icon,
+  disabled = false,
 }: {
   enabled: boolean;
   label: string;
   onPress: () => void;
+  icon?: ReactNode;
+  disabled?: boolean;
 }) {
   const styles = useThemeStyles(createStyles);
   return (
     <Pressable
       accessibilityRole="switch"
-      accessibilityState={{ checked: enabled }}
+      accessibilityState={{ checked: enabled, disabled }}
+      disabled={disabled}
       onPress={onPress}
       style={({ pressed }) => [
         styles.settingRow,
+        disabled && styles.disabledSetting,
         pressed && styles.pressed,
       ]}
     >
-      <Text style={styles.settingText}>{label}</Text>
+      <View style={styles.settingLabelGroup}>{icon}<Text style={styles.settingText}>{label}</Text></View>
       <View style={[styles.toggle, enabled && styles.toggleEnabled]}>
         <View style={[styles.toggleKnob, enabled && styles.toggleKnobEnabled]} />
       </View>
@@ -433,6 +448,8 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     borderBottomWidth: 1,
     borderColor: colors.border,
   },
+  settingLabelGroup: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  disabledSetting: { opacity: 0.5 },
   settingText: {
     color: colors.textSecondary,
     fontFamily: 'SpaceMono_700Bold',

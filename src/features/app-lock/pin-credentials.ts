@@ -1,6 +1,7 @@
 import { pbkdf2Async } from '@noble/hashes/pbkdf2.js';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { bytesToHex, hexToBytes, utf8ToBytes } from '@noble/hashes/utils.js';
+import type { BiometricCredential, WebBiometricCredential } from './biometric-types';
 
 const ITERATIONS = 600_000;
 export const LOCK_STORAGE_KEY = 'gawin.app-lock.v1';
@@ -13,6 +14,7 @@ export type LockRecord = {
   delay: LockDelay;
   failures: number;
   blockedUntil: number;
+  biometric?: BiometricCredential;
 };
 
 function equal(first: string, second: string) {
@@ -74,6 +76,17 @@ export function failedAttempt(record: LockRecord, now = Date.now()): LockRecord 
   return { ...record, failures, blockedUntil: delay ? now + delay * 1000 : 0 };
 }
 
+function validBiometricCredential(value: unknown): value is BiometricCredential {
+  if (!value || typeof value !== 'object') return false;
+  const credential = value as { kind?: string };
+  if (credential.kind === 'native') return true;
+  if (credential.kind !== 'webauthn') return false;
+  const web = value as Partial<WebBiometricCredential>;
+  return [web.id, web.publicKey, web.userId].every((part) => typeof part === 'string' && /^[A-Za-z0-9_-]{1,2048}$/.test(part)) &&
+    typeof web.rpId === 'string' && web.rpId.length > 0 && web.rpId.length <= 253 &&
+    typeof web.origin === 'string' && web.origin.length > 0 && web.origin.length < 2048;
+}
+
 export function parseLockRecord(value: string | null): LockRecord | null {
   if (value === null) return null;
   const record = JSON.parse(value) as LockRecord;
@@ -81,7 +94,8 @@ export function parseLockRecord(value: string | null): LockRecord | null {
     record?.version !== 1 || !/^[a-f0-9]{32}$/.test(record.pin?.salt) ||
     !/^[a-f0-9]{64}$/.test(record.pin?.hash) || !/^[a-f0-9]{64}$/.test(record.recoveryHash) ||
     ![0, 30].includes(record.delay) || !Number.isSafeInteger(record.failures) || record.failures < 0 ||
-    !Number.isSafeInteger(record.blockedUntil) || record.blockedUntil < 0
+    !Number.isSafeInteger(record.blockedUntil) || record.blockedUntil < 0 ||
+    (record.biometric !== undefined && !validBiometricCredential(record.biometric))
   ) throw new Error('Unable to read App Lock.');
   return record;
 }

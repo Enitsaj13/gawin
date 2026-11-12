@@ -8,20 +8,23 @@ import { useFeedback } from '@/features/preferences/preferences-context';
 import { ThemeColors, useAppTheme, useThemeStyles } from '@/theme/theme';
 import { useAppLock } from './app-lock-context';
 import { recoveryCode } from './pin-credentials';
+import { BiometricIcon } from './biometric-icon';
+import { DeviceUnlockError } from './biometric-types';
 
-export type PinMode = 'setup' | 'change' | 'disable' | 'unlock';
-type Stage = 'verify' | 'create' | 'confirm' | 'save-recovery' | 'recover';
+export type PinMode = 'setup' | 'change' | 'disable' | 'unlock' | 'biometric-enable' | 'biometric-disable';
+type Stage = 'verify' | 'create' | 'confirm' | 'save-recovery' | 'recover' | 'device-prompt';
 
 export function LockIcon() {
   const styles = useThemeStyles(createStyles);
   return <View accessible={false} style={styles.lockIcon}><View style={styles.lockArch} /><View style={styles.lockBody}><View style={styles.lockMark} /></View></View>;
 }
 
-function PinPad({ busy, onComplete }: { busy: boolean; onComplete: (pin: string) => Promise<void> }) {
+function PinPad({ busy, deviceBusy, onComplete, onDeviceUnlock }: { busy: boolean; deviceBusy: boolean; onComplete: (pin: string) => Promise<void>; onDeviceUnlock?: () => void }) {
   const styles = useThemeStyles(createStyles);
   const feedback = useFeedback();
   const [digits, setDigits] = useState('');
   const pending = useRef(false);
+  const { deviceCapability } = useAppLock();
   const input = (value: string) => {
     if (busy || pending.current) return;
     if (value === 'delete') { setDigits((current) => current.slice(0, -1)); return; }
@@ -60,7 +63,15 @@ function PinPad({ busy, onComplete }: { busy: boolean; onComplete: (pin: string)
           onPress={() => input(key)}
           style={({ pressed }) => [styles.key, pressed && styles.keyPressed, busy && styles.disabled]}
         ><Text style={key === 'delete' ? styles.deleteKey : styles.keyText}>{key === 'delete' ? 'Delete' : key}</Text></Pressable>
-      ) : <View key="blank" style={styles.key} />)}
+      ) : onDeviceUnlock ? <Pressable
+        key="device-unlock"
+        accessibilityRole="button"
+        accessibilityLabel={`Unlock with ${deviceCapability?.label ?? 'device authentication'}`}
+        accessibilityHint="Your PIN is always available as an alternative."
+        disabled={deviceBusy}
+        onPress={onDeviceUnlock}
+        style={({ pressed }) => [styles.key, pressed && styles.keyPressed, deviceBusy && styles.disabled]}
+      ><BiometricIcon kind={deviceCapability?.icon ?? 'device'} /></Pressable> : <View key="blank" style={styles.key} />)}
     </View>
   </>;
 }
@@ -94,7 +105,7 @@ export function PinScreen({ mode, onClose, onDone, onBusyChange }: { mode: PinMo
     setBusy(true);
     setError('');
     try { await action(); } catch (failure) {
-      feedback.warning();
+      if (!(failure instanceof DeviceUnlockError && failure.cancelled)) feedback.warning();
       setError(failure instanceof Error ? failure.message : 'Something went wrong. Please try again.');
     } finally { inFlight.current = false; onBusyChange?.(false); setBusy(false); setNow(Date.now()); }
   };
@@ -103,7 +114,9 @@ export function PinScreen({ mode, onClose, onDone, onBusyChange }: { mode: PinMo
     if (stage === 'verify') {
       if (mode === 'unlock') { await lock.unlock(pin); return; }
       if (mode === 'disable') { await lock.disable(pin); onDone?.(); return; }
+      if (mode === 'biometric-disable') { await lock.disableDeviceUnlock(pin); onDone?.(); return; }
       await lock.authenticate(pin);
+      if (mode === 'biometric-enable') { setStage('device-prompt'); return; }
       previousPin.current = pin;
       setStage('create');
     } else if (stage === 'create') {
@@ -123,15 +136,22 @@ export function PinScreen({ mode, onClose, onDone, onBusyChange }: { mode: PinMo
     }
   });
 
-  const title = stage === 'save-recovery' ? 'Save your recovery code'
+  const deviceLabel = lock.deviceCapability?.label ?? 'Device unlock';
+  const title = stage === 'device-prompt' ? `Enable ${deviceLabel}`
+    : stage === 'save-recovery' ? 'Save your recovery code'
     : stage === 'recover' ? 'Recover access'
     : stage === 'confirm' ? 'Confirm your PIN'
     : stage === 'create' ? (mode === 'setup' ? 'Create your PIN' : 'Create a new PIN')
+    : mode === 'biometric-enable' ? 'Verify your PIN'
+    : mode === 'biometric-disable' ? 'Turn off device unlock'
     : mode === 'disable' ? 'Turn off App Lock' : mode === 'change' ? 'Enter your current PIN' : 'Enter your PIN';
-  const description = stage === 'save-recovery' ? 'Keep this somewhere safe outside Gawin. You can use it to reset a forgotten PIN.'
+  const description = stage === 'device-prompt' ? 'Confirm with your device to finish setup. Your Gawin PIN stays available.'
+    : stage === 'save-recovery' ? 'Keep this somewhere safe outside Gawin. You can use it to reset a forgotten PIN.'
     : stage === 'recover' ? 'Enter the recovery code you saved when enabling App Lock.'
     : stage === 'confirm' ? 'Enter those six digits once more.'
     : stage === 'create' ? 'Choose six digits to keep Gawin private.'
+    : mode === 'biometric-enable' ? 'Before adding another way to unlock Gawin.'
+    : mode === 'biometric-disable' ? 'Enter your PIN to keep using PIN unlock only.'
     : mode === 'disable' ? 'Enter your PIN to remove the lock.'
     : mode === 'change' ? 'Verify it before choosing a new one.' : 'A quiet space, just for you.';
 
@@ -144,10 +164,14 @@ export function PinScreen({ mode, onClose, onDone, onBusyChange }: { mode: PinMo
       </View>
       <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         <View style={styles.content}>
-          <LockIcon />
+          {stage === 'device-prompt' ? <View style={styles.deviceHeadingIcon}><BiometricIcon kind={lock.deviceCapability?.icon ?? 'device'} size={28} /></View> : <LockIcon />}
           <Text accessibilityRole="header" style={styles.heading}>{title}</Text>
           <Text style={styles.description}>{description}</Text>
-          {stage === 'save-recovery' ? <>
+          {stage === 'device-prompt' ? <>
+            <Text style={styles.note}>{lock.deviceCapability?.description}</Text>
+            <Pressable accessibilityRole="button" disabled={busy} onPress={() => void perform(async () => { await lock.enableDeviceUnlock(); onDone?.(); })} style={[styles.primary, busy && styles.disabled]}><Text style={styles.primaryText}>{busy ? 'Waiting for your device…' : 'Enable device unlock'}</Text></Pressable>
+            {!busy ? <Pressable accessibilityRole="button" onPress={() => { setError(''); setStage('verify'); }} style={styles.textButton}><Text style={styles.linkText}>Verify PIN again</Text></Pressable> : null}
+          </> : stage === 'save-recovery' ? <>
             <Text selectable style={styles.recoveryCode}>{code}</Text>
             <Text style={styles.note}>Select and copy this code. Without your PIN or recovery code, you cannot unlock Gawin.</Text>
             <Pressable accessibilityRole="button" disabled={busy} onPress={() => void perform(async () => { await lock.enable(newPin.current, code); onDone?.(); })} style={[styles.primary, busy && styles.disabled]}><Text style={styles.primaryText}>{busy ? 'Enabling…' : 'I saved my code · Enable lock'}</Text></Pressable>
@@ -166,7 +190,11 @@ export function PinScreen({ mode, onClose, onDone, onBusyChange }: { mode: PinMo
             />
             <Text style={styles.note}>Your saved recovery code stays valid after resetting your PIN.</Text>
             <Pressable accessibilityRole="button" disabled={busy || seconds > 0 || !code.trim()} onPress={() => void perform(async () => { await lock.authenticateRecovery(code); setRecovering(true); setStage('create'); })} style={[styles.primary, (busy || seconds > 0 || !code.trim()) && styles.disabled]}><Text style={styles.primaryText}>{busy ? 'Checking…' : 'Continue'}</Text></Pressable>
-          </> : <PinPad key={stage} busy={busy || seconds > 0} onComplete={complete} />}
+          </> : <PinPad key={stage} busy={busy || seconds > 0} deviceBusy={busy} onComplete={complete}
+            onDeviceUnlock={mode === 'unlock' && stage === 'verify' && lock.biometricEnabled && lock.deviceCapability?.supported
+              ? () => void perform(() => lock.unlockWithDevice()) : undefined}
+          />}
+          {mode === 'unlock' && stage === 'verify' && lock.biometricEnabled ? <Text style={styles.deviceHint}>{lock.deviceCapability?.supported ? `Enter your PIN or tap the ${lock.deviceCapability.icon === 'face' ? 'Face ID' : lock.deviceCapability.icon === 'fingerprint' ? 'fingerprint' : 'device'} icon.` : 'Device unlock is unavailable. Use your PIN.'}</Text> : null}
           <Text accessibilityLiveRegion="polite" style={styles.message}>{seconds > 0 ? `Try again in ${seconds}s.` : busy ? 'Please wait…' : error || ' '}</Text>
           {mode === 'unlock' && (stage === 'verify' || stage === 'recover') ? <Pressable accessibilityRole="button" disabled={busy} onPress={() => { setError(''); setCode(''); setStage(stage === 'verify' ? 'recover' : 'verify'); }} style={styles.textButton}><Text style={styles.linkText}>{stage === 'verify' ? 'Forgot PIN?' : 'Use PIN instead'}</Text></Pressable> : null}
           {stage === 'confirm' && !busy ? <Pressable accessibilityRole="button" onPress={() => { newPin.current = ''; setError(''); setStage('create'); }} style={styles.textButton}><Text style={styles.linkText}>Choose a different PIN</Text></Pressable> : null}
@@ -190,6 +218,8 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   scrollContent: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: 28, paddingTop: 24, paddingBottom: 40 },
   content: { width: '100%', maxWidth: 340, alignSelf: 'center', alignItems: 'center' },
   lockIcon: { width: 24, height: 28, marginBottom: 22 },
+  deviceHeadingIcon: { marginBottom: 22 },
+  deviceHint: { marginTop: 14, fontFamily: 'SpaceMono_400Regular', fontSize: 10, lineHeight: 18, color: colors.textMuted, textAlign: 'center' },
   lockArch: { position: 'absolute', width: 14, height: 14, left: 5, top: 0, borderWidth: 1.5, borderColor: colors.textSecondary, borderTopLeftRadius: 7, borderTopRightRadius: 7 },
   lockBody: { position: 'absolute', width: 24, height: 18, bottom: 0, borderWidth: 1.5, borderColor: colors.textSecondary, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center' },
   lockMark: { width: 1.5, height: 5, backgroundColor: colors.textSecondary },

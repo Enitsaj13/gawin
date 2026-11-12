@@ -3,6 +3,8 @@ import { AppState, Platform } from 'react-native';
 import { createContext, PropsWithChildren, useCallback, useContext, useEffect, useRef, useState } from 'react';
 
 import { readLock, removeLock, withLockOperation, writeLock } from './lock-storage';
+import { authenticateDevice, deviceUnlockCapability, enrollDevice } from './device-unlock';
+import type { DeviceUnlockCapability } from './biometric-types';
 import { createPinCredential, failedAttempt, hashRecovery, LOCK_STORAGE_KEY, LockDelay, LockRecord, matchesPin, matchesRecovery, parseLockRecord } from './pin-credentials';
 
 type AppLockContextValue = {
@@ -13,6 +15,8 @@ type AppLockContextValue = {
   covered: boolean;
   delay: LockDelay;
   blockedUntil: number;
+  deviceCapability: DeviceUnlockCapability | null;
+  biometricEnabled: boolean;
   retryLoad: () => Promise<void>;
   enable: (pin: string, recovery: string) => Promise<void>;
   authenticate: (pin: string) => Promise<void>;
@@ -23,6 +27,9 @@ type AppLockContextValue = {
   disable: (pin: string) => Promise<void>;
   setDelay: (delay: LockDelay) => Promise<void>;
   lockNow: () => void;
+  enableDeviceUnlock: () => Promise<void>;
+  disableDeviceUnlock: (pin: string) => Promise<void>;
+  unlockWithDevice: () => Promise<void>;
 };
 const Context = createContext<AppLockContextValue | null>(null);
 
@@ -32,10 +39,20 @@ export function AppLockProvider({ children }: PropsWithChildren) {
   const [storageError, setStorageError] = useState(false);
   const [locked, setLocked] = useState(true);
   const [covered, setCovered] = useState(false);
+  const [deviceCapability, setDeviceCapability] = useState<DeviceUnlockCapability | null>(null);
   const recordRef = useRef<LockRecord | null>(null);
   const activeRef = useRef(true);
   const sessionRef = useRef(0);
   const busyRef = useRef(false);
+  const systemPromptRef = useRef(false);
+  const promptAbortRef = useRef<AbortController | null>(null);
+  const deviceGrantRef = useRef<{ session: number; pinHash: string; expires: number } | null>(null);
+
+  const refreshCapability = useCallback(async () => {
+    try { setDeviceCapability(await deviceUnlockCapability()); }
+    catch { setDeviceCapability({ supported: false, label: 'Device unlock', icon: 'device', description: 'Device unlock is unavailable here. Your PIN stays available.' }); }
+  }, []);
+  useEffect(() => { void Promise.resolve().then(refreshCapability); }, [refreshCapability]);
 
   const persist = useCallback(async (next: LockRecord | null) => {
     if (next) await writeLock(JSON.stringify(next));
@@ -62,6 +79,8 @@ export function AppLockProvider({ children }: PropsWithChildren) {
 
   const lockNow = useCallback(() => {
     sessionRef.current += 1;
+    deviceGrantRef.current = null;
+    promptAbortRef.current?.abort();
     setLocked(true);
   }, []);
 
@@ -71,6 +90,9 @@ export function AppLockProvider({ children }: PropsWithChildren) {
     const visibility = (active: boolean) => {
       activeRef.current = active;
       if (!recordRef.current) return;
+      // The OS authentication sheet can temporarily mark the app inactive.
+      // It must not cover/cancel its own prompt or expire the setup session.
+      if (systemPromptRef.current) { clearTimeout(timer); hiddenAt = null; return; }
       setCovered(!active);
       if (!active && hiddenAt === null) {
         hiddenAt = Date.now();
@@ -84,7 +106,10 @@ export function AppLockProvider({ children }: PropsWithChildren) {
       }
     };
     if (Platform.OS === 'web') {
-      const onVisibility = () => visibility(document.visibilityState === 'visible');
+      const onVisibility = () => {
+        visibility(document.visibilityState === 'visible');
+        if (document.visibilityState === 'visible') void refreshCapability();
+      };
       const onPageHide = () => visibility(false);
       const onStorage = (event: StorageEvent) => {
         // Another tab changed credentials, attempts, or the lock setting.
@@ -107,9 +132,29 @@ export function AppLockProvider({ children }: PropsWithChildren) {
       };
     }
     visibility(AppState.currentState === 'active');
-    const subscription = AppState.addEventListener('change', (state) => visibility(state === 'active'));
+    const subscription = AppState.addEventListener('change', (state) => {
+      visibility(state === 'active');
+      if (state === 'active') void refreshCapability();
+    });
     return () => { clearTimeout(timer); subscription.remove(); };
-  }, [lockNow, retryLoad]);
+  }, [lockNow, refreshCapability, retryLoad]);
+
+  const finishSystemPrompt = useCallback(async () => {
+    // Face ID may resolve just before iOS reports that its sheet has dismissed.
+    if (Platform.OS !== 'web' && !activeRef.current) {
+      await new Promise<void>((resolve) => {
+        let attempts = 0;
+        const check = () => {
+          if (activeRef.current || attempts++ >= 20) resolve();
+          else setTimeout(check, 50);
+        };
+        check();
+      });
+    }
+    systemPromptRef.current = false;
+    setCovered(!activeRef.current);
+    if (!activeRef.current) lockNow();
+  }, [lockNow]);
 
   // Serialize local attempts and reread persisted cooldowns before checking.
   const run = useCallback(async (action: () => Promise<void>) => {
@@ -133,7 +178,12 @@ export function AppLockProvider({ children }: PropsWithChildren) {
     return next;
   }, [persist]);
 
-  const authenticate = useCallback((pin: string) => run(async () => { await verify(pin); }), [run, verify]);
+  const authenticate = useCallback((pin: string) => run(async () => {
+    const session = sessionRef.current;
+    const current = await verify(pin);
+    if (session !== sessionRef.current || !activeRef.current || locked) throw new Error('Unlock Gawin and try again.');
+    deviceGrantRef.current = { session, pinHash: current.pin.hash, expires: Date.now() + 120_000 };
+  }), [locked, run, verify]);
   const authenticateRecovery = useCallback((code: string) => run(async () => { await verify(code, true); }), [run, verify]);
   const unlock = useCallback((pin: string) => run(async () => {
     const session = sessionRef.current;
@@ -156,7 +206,9 @@ export function AppLockProvider({ children }: PropsWithChildren) {
     const session = sessionRef.current;
     const current = await verify(code, true);
     const credential = await createPinCredential(newPin, await getRandomBytesAsync(16));
-    await persist({ ...current, pin: credential });
+    const next = { ...current, pin: credential };
+    delete next.biometric;
+    await persist(next);
     if (activeRef.current && session === sessionRef.current) setLocked(false);
   }), [persist, run, verify]);
   const disable = useCallback((pin: string) => run(async () => {
@@ -171,7 +223,77 @@ export function AppLockProvider({ children }: PropsWithChildren) {
     await persist({ ...current, delay });
   }), [locked, persist, run]);
 
-  return <Context.Provider value={{ ready, storageError, enabled: Boolean(record), locked, covered, delay: record?.delay ?? 30, blockedUntil: record?.blockedUntil ?? 0, retryLoad, enable, authenticate, authenticateRecovery, unlock, changePin, recover, disable, setDelay, lockNow }}>{children}</Context.Provider>;
+  const enableDeviceUnlock = useCallback(async () => {
+    const grant = deviceGrantRef.current;
+    const initial = recordRef.current;
+    if (busyRef.current) throw new Error('Please wait a moment.');
+    if (!grant || !initial || locked || grant.session !== sessionRef.current || grant.pinHash !== initial.pin.hash || grant.expires < Date.now()) {
+      throw new Error('Verify your PIN again before enabling device unlock.');
+    }
+    busyRef.current = true;
+    systemPromptRef.current = true;
+    const controller = new AbortController();
+    promptAbortRef.current = controller;
+    let settled = false;
+    try {
+      // Keep this invocation before any await: Safari requires a direct user tap.
+      const request = enrollDevice(controller.signal);
+      const biometric = await request;
+      await finishSystemPrompt();
+      settled = true;
+      await withLockOperation(async () => {
+        const current = parseLockRecord(await readLock());
+        if (controller.signal.aborted || !activeRef.current || sessionRef.current !== grant.session || !current || current.pin.hash !== grant.pinHash) throw new Error('Setup expired. Verify your PIN and try again.');
+        await persist({ ...current, biometric });
+      });
+      deviceGrantRef.current = null;
+    } finally {
+      if (!settled) await finishSystemPrompt();
+      promptAbortRef.current = null;
+      busyRef.current = false;
+    }
+  }, [finishSystemPrompt, locked, persist]);
+
+  const disableDeviceUnlock = useCallback((pin: string) => run(async () => {
+    const current = await verify(pin);
+    const next = { ...current };
+    delete next.biometric;
+    await persist(next);
+    deviceGrantRef.current = null;
+  }), [persist, run, verify]);
+
+  const unlockWithDevice = useCallback(async () => {
+    const initial = recordRef.current;
+    if (busyRef.current) throw new Error('Please wait a moment.');
+    if (!initial?.biometric) throw new Error('Use your PIN, then enable device unlock in Settings.');
+    const session = sessionRef.current;
+    busyRef.current = true;
+    systemPromptRef.current = true;
+    const controller = new AbortController();
+    promptAbortRef.current = controller;
+    let settled = false;
+    try {
+      const request = authenticateDevice(initial.biometric, controller.signal);
+      await request;
+      await finishSystemPrompt();
+      settled = true;
+      await withLockOperation(async () => {
+        const current = parseLockRecord(await readLock());
+        if (controller.signal.aborted || !activeRef.current || session !== sessionRef.current || !current || current.pin.hash !== initial.pin.hash || JSON.stringify(current.biometric) !== JSON.stringify(initial.biometric)) {
+          throw new Error('Unlock settings changed. Use your PIN or try again.');
+        }
+        await persist({ ...current, failures: 0, blockedUntil: 0 });
+        if (!activeRef.current || session !== sessionRef.current) throw new Error('Please unlock again.');
+        setLocked(false);
+      });
+    } finally {
+      if (!settled) await finishSystemPrompt();
+      promptAbortRef.current = null;
+      busyRef.current = false;
+    }
+  }, [finishSystemPrompt, persist]);
+
+  return <Context.Provider value={{ ready, storageError, enabled: Boolean(record), locked, covered, delay: record?.delay ?? 30, blockedUntil: record?.blockedUntil ?? 0, deviceCapability, biometricEnabled: Boolean(record?.biometric), retryLoad, enable, authenticate, authenticateRecovery, unlock, changePin, recover, disable, setDelay, lockNow, enableDeviceUnlock, disableDeviceUnlock, unlockWithDevice }}>{children}</Context.Provider>;
 }
 
 export function useAppLock() {

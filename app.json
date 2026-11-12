@@ -44,7 +44,13 @@
         }
       ],
       "expo-sharing",
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Allow Gawin to use Face ID to unlock your tasks."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

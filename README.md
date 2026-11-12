@@ -21,6 +21,7 @@ The name comes from the Filipino word _gawin_—to do or get something done.
 - Repeating schedules for daily, weekday, weekend, or selected-day routines
 - Optional local task reminders
 - Optional six-digit App Lock with offline recovery and automatic locking
+- Optional device unlock: native Face ID/fingerprint and PWA passkeys
 - Minimalist action sheets, toast messages, and tactile feedback
 - Preferences for haptics, reduced motion, and backup reminders
 - Fully offline storage with no account required
@@ -51,8 +52,32 @@ with 600,000 iterations and persistent retry delays. Native credentials use
 SecureStore; the PWA keeps verification records in browser storage. This is an
 interface privacy lock, not encryption of task storage. Clearing browser data
 can remove the lock and tasks. PINs and recovery credentials are excluded from
-task backups, so keep the recovery code separately. Biometric unlock is not
-included yet.
+task backups, so keep the recovery code separately.
+
+Once App Lock is enabled, turn on **Device unlock** (or Face ID/Touch ID/
+fingerprint on native builds) in the same Privacy section. Verify your Gawin PIN,
+then tap the setup button to confirm with your device. On the lock screen, tap
+the outline icon beside `0` to use device authentication; PIN entry is always
+available. Cancelling a system prompt does not count as an incorrect PIN.
+
+Native builds use the operating system's biometric prompt and strong Android
+biometrics. Face ID needs a development/production build rather than Expo Go.
+Existing native development builds must be rebuilt after adding
+`expo-local-authentication` and `react-native-svg`.
+
+The PWA uses WebAuthn/passkeys on HTTPS (or localhost) when a platform
+authenticator is available. Gawin verifies fresh challenges, origin, relying
+party, user verification, credential identity and signatures locally; there is
+no Gawin account or authentication server. The browser controls the system
+prompt and may offer a device passcode or passkey provider. Initial enrollment
+or a provider's sync may need internet; cached Gawin and a locally available
+credential can unlock without a Gawin server. PIN unlock remains fully offline.
+Real-device/offline behavior depends on the browser and credential provider.
+
+Device unlock is tied to the website domain and this browser's saved App Lock
+record. It is excluded from task backups. Turning it off removes Gawin's link;
+it does not delete a saved passkey from the system password manager. Recovery-code
+PIN resets turn device unlock off; you can enable it again after recovering.
 
 Task reminders are scheduled locally. Native builds can deliver them while the
 app is closed; browser reminders are best-effort and require the installed PWA
